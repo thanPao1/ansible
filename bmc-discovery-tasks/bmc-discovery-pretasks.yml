@@ -1,0 +1,49 @@
+- name: "PRE | Tareas previas al descubrimiento BMC"
+  hosts: localhost
+  gather_facts: false
+
+  tasks:
+
+    - name: "PRE | Establecer facts globales del reporte"
+      ansible.builtin.set_fact:
+        local_fetch_path: "{{ local_fetch_path }}"
+        consolidated_report_name: "{{ consolidated_report_name }}"
+        execution_epoch: "{{ now(utc=True, fmt='%s') }}"
+        # Flags de control
+        scan_failed: false
+        scan_error_message: ""
+        scan_failed_task: ""
+        scan_run_id: ""
+        scan_final_status: "NOT_STARTED"
+
+    - name: "PRE | Crear directorio local temporal para reportes"
+      ansible.builtin.file:
+        path: "{{ local_fetch_path }}"
+        state: directory
+        mode: "0755"
+
+    - name: "PRE | Obtener fecha/hora de ejecución"
+      ansible.builtin.setup:
+        gather_subset:
+          - date_time
+      delegate_facts: true
+
+    - name: "PRE | Sobreescribir execution_epoch con valor entero"
+      ansible.builtin.set_fact:
+        execution_epoch: "{{ ansible_date_time.epoch | int }}"
+
+    - name: "PRE | Verificar conectividad HTTPS a BMC Helix Discovery"
+      ansible.builtin.uri:
+        url: "{{ bmc_discovery_host }}/api/about"
+        method: GET
+        validate_certs: true
+        status_code: 200
+        timeout: 15
+      register: bmc_connectivity_check
+      failed_when: bmc_connectivity_check.status != 200
+
+    - name: "PRE | Mostrar versiones de API disponibles"
+      ansible.builtin.debug:
+        msg: >
+          BMC Helix Discovery alcanzable.
+          Versiones API: {{ bmc_connectivity_check.json | to_nice_json }}

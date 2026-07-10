@@ -1,0 +1,66 @@
+# Caso de main 
+#            para una IP específica vía REST API.
+# EJECUTA EN: localhost (AAP) — NO requiere SSH a ningún host destino
+# VARIABLES : target_ip  → Survey de AAP (ej. "10.10.10.50")
+---
+# PLAY 1: Setup global - Pre-tasks y validación de variables
+- name: "BMC Discovery | Pre-flight checks y setup"
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars_files:
+    - vars/bmc-discovery-data.yml
+    - vars/bmc-discovery-secrets.yml
+  tasks:
+
+    - name: "PRE | Validar variable requerida: target_ip"
+      ansible.builtin.assert:
+        that:
+          - target_ip is defined
+          - target_ip != ''
+          - target_ip is ipaddr
+          #-target_ip | length > 0
+          #-target_ip | ansible.utils.ipaddr
+        fail_msg: >
+          La variable 'target_ip' no está definida o no es una IP válida.
+          Debe definirse en el Survey del Job Template en AAP.
+          Ejemplo: target_ip=10.10.10.50
+
+    - name: "PRE | Inicializar facts globales de ejecución"
+      ansible.builtin.import_tasks:
+        file: bmc-discovery-tasks/bmc-discovery-pretasks.yml
+
+# PLAY 2: Core - Autenticación, Scan y Polling
+
+- name: "BMC Discovery | Ejecutar Adhoc Discovery scan"
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars_files:
+    - vars/bmc-discovery-data.yml
+    - vars/bmc-discovery-secrets.yml
+  tasks:
+
+    - name: "RUN | Recuperar facts globales del Play 1"
+      ansible.builtin.set_fact:
+        local_fetch_path:         "{{ hostvars['localhost'].local_fetch_path }}"
+        consolidated_report_name: "{{ hostvars['localhost'].consolidated_report_name }}"
+        execution_epoch:          "{{ hostvars['localhost'].execution_epoch }}"
+
+    - name: "RUN | Ejecutar workflow BMC Discovery"
+      ansible.builtin.import_tasks:
+        file: "globales/bmc-discovery-run.yml"
+
+
+# PLAY 3: Post-tasks - Reporte y limpieza
+- name: "BMC Discovery | Reporte "
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars_files:
+    - vars/bmc-discovery-data.yml
+  tasks:
+
+    - name: "POST | Generar reporte consolidado y subir a GCS"
+      ansible.builtin.import_tasks:
+        file: "scan + poll/bmc-discovery-postasks.yml"

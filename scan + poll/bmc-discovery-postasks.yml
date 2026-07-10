@@ -1,0 +1,25 @@
+---
+- name: "POST | Create consolidated report with header"
+  ansible.builtin.copy:
+    content: "target_ip,run_id,final_status,failed_task,error_message\n"
+    dest:    "{{ hostvars['localhost'].local_fetch_path }}/{{ hostvars['localhost'].consolidated_report_name }}"
+
+- name: "POST | Consolidate all execution reports"
+  ansible.builtin.shell:
+    cmd: >
+      tail -n +2 {{ hostvars['localhost'].local_fetch_path }}/status_report_*.csv >>
+      {{ hostvars['localhost'].local_fetch_path }}/{{ hostvars['localhost'].consolidated_report_name }} || true
+  changed_when: false
+
+- name: "POST | Upload consolidated report to Google Cloud Storage"
+  google.cloud.gcp_storage_object:
+    bucket: "sit-devops-repository-bkt02"
+    src:    "{{ hostvars['localhost'].local_fetch_path }}/{{ hostvars['localhost'].consolidated_report_name }}"
+    dest:   "reporte-bmc-discovery/{{ hostvars['localhost'].execution_epoch }}-discovery-report.csv"
+    project: "sit-devops-repository"
+    action: upload
+
+- name: "POST | Clean up local temporary files"
+  ansible.builtin.file:
+    path:  "{{ hostvars['localhost'].local_fetch_path }}"
+    state: absent

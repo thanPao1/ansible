@@ -1,0 +1,12 @@
+---
+bmc_discovery_host: "https://liverpool-itom.onbmc.com"
+bmc_api_version: "v2.0"
+bmc_vault_path: "ansible_discovery_automation"
+
+scan_level: "Full Discovery"
+scan_timeout_minutes: 30
+poll_interval_seconds: 15
+poll_max_retries: 120
+
+local_fetch_path: "/tmp/ansible_bmc_reports_{{ now(utc=True, fmt='%Y%m%d%H%M%S') }}"
+consolidated_report_name: "report-BMCDiscovery-{{ now(utc=True, fmt='%Y-%m-%dT%H%M%SZ') }}.csv"
