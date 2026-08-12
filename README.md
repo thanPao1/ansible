@@ -1,9 +1,9 @@
 # Playbooks
 ## Ansible
-Objetivo:
+### Objetivo:
 Que Ansible ejecute un job/playbook que invoque a BMC Discovery para realizar un discovery inmediato sobre una IP.
 
-REST API:
+### REST API:
 BMC Discovery expone APIs para:
   * crear scans
   * ejecutar discovery runs
@@ -11,7 +11,7 @@ BMC Discovery expone APIs para:
 
 Ansible consumiría esas APIs.
 
-Infraestructura Discovery:
+### Infraestructura Discovery:
 Contamos con 11 Outpost (Servidores windows Onprem donde se almacenan las credenciales y donde discovery se comunica con los destinos)
 
 Operación que usarias:
@@ -40,25 +40,27 @@ Acceder a APIs
 Leer ranges/outposts
 
 El cual los roles serian:
--Discovery User
--API Access
--Scan Control / Discovery Run permissions
+* Discovery User
+* API Access
+* Scan Control / Discovery Run permissions
 
-Grupo en ADDM:
-api_users ó discovery_operators... Para esto yo puedo crear un grupo que se llame "ansible_discovery_automation" para tener bien mapeado el uso de ese usuario
+### Grupo en ADDM:
+ api_users ó discovery_operators... Para esto yo puedo crear un grupo que se llame "ansible_discovery_automation" para tener bien mapeado el uso de ese usuario
 
-SHELL:
-No lo necesitas porque solo se usara API ya que no requieren login a linux
+### SHELL:
+ No lo necesitas porque solo se usara API ya que no requieren login a linux
 
 ## Nagios
 Estructura de playbook y recursos necesarios
 
-IP: 172.16.202.219
-User: ansible_nagios
-API_Token: rCLns0G8Z9B06kGXG7EqaeL5GRGGJ8m64P40K4mCjPHXmlDZcb3BENV8TWhgP9JQ
+### IP: 
+* 172.16.202.219
+* User: ansible_nagios
+* API_Token: rCLns0G8Z9B06kGXG7EqaeL5GRGGJ8m64P40K4mCjPHXmlDZcb3BENV8TWhgP9JQ
 
 La estructura para dar de alta los hots, es la siguiente: 
 
+```
 define host {
     host_name                qroplantso8_copy_1
     use                      liv-host-linux
@@ -69,5 +71,6 @@ define host {
     notifications_enabled    0
     register                 1
 }
+```
 
 Es importante mencionar que la playbook no debe de crear los servicios de monitoreo, únicamente dar de alta el Host en el hostgroup antes mencionado.
