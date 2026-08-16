@@ -1,0 +1,77 @@
+---
+# ==============================================================================
+# PLAYBOOK : nagios-main.yml
+# PROPÓSITO: Dar de alta un Host en Nagios XI via REST API
+#            SIN crear servicios de monitoreo
+# EJECUTA EN: localhost (AAP) — NO requiere SSH a ningún host destino
+# VARIABLES SURVEY AAP:
+#   - host_name  → nombre del host (ej. qroplantso8_copy_1)
+#   - host_alias → alias descriptivo (ej. Plantilla)
+#   - host_ip    → IP del host a monitorear (ej. 172.16.202.43)
+# ==============================================================================
+
+# ------------------------------------------------------------------------------
+# PLAY 1 | Pre-flight: validación de variables y setup de facts globales
+# ------------------------------------------------------------------------------
+- name: "Nagios | Pre-flight checks y setup"
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars_files:
+    - vars/nagios-data.yml
+    - vars/nagios-secrets.yml
+  tasks:
+
+    - name: "PRE | Validar variables requeridas del Survey"
+      ansible.builtin.assert:
+        that:
+          - host_name is defined and host_name | length > 0
+          - host_alias is defined and host_alias | length > 0
+          - host_ip is defined and host_ip | length > 0
+        fail_msg: >
+          Variables requeridas no definidas.
+          Definirlas en el Survey del Job Template en AAP:
+          - host_name  (ej. qroplantso8_copy_1)
+          - host_alias (ej. Plantilla)
+          - host_ip    (ej. 172.16.202.43)
+
+    - name: "PRE | Inicializar facts globales de ejecucion"
+      ansible.builtin.import_tasks:
+        file: nagios-tasks/nagios-pretasks.yml
+
+# ------------------------------------------------------------------------------
+# PLAY 2 | Core: dar de alta el host en Nagios XI
+# ------------------------------------------------------------------------------
+- name: "Nagios | Registrar Host en Nagios XI"
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars_files:
+    - vars/nagios-data.yml
+    - vars/nagios-secrets.yml
+  tasks:
+
+    - name: "RUN | Recuperar facts globales del Play 1"
+      ansible.builtin.set_fact:
+        local_fetch_path:         "{{ hostvars['localhost'].local_fetch_path }}"
+        consolidated_report_name: "{{ hostvars['localhost'].consolidated_report_name }}"
+        execution_epoch:          "{{ hostvars['localhost'].execution_epoch }}"
+
+    - name: "RUN | Ejecutar registro de host en Nagios"
+      ansible.builtin.import_tasks:
+        file: nagios-tasks/nagios-run.yml
+
+# ------------------------------------------------------------------------------
+# PLAY 3 | Post-tasks: reporte y limpieza
+# ------------------------------------------------------------------------------
+- name: "Nagios | Reporte y limpieza"
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars_files:
+    - vars/nagios-data.yml
+  tasks:
+
+    - name: "POST | Generar reporte consolidado y limpiar"
+      ansible.builtin.import_tasks:
+        file: nagios-tasks/nagios-postasks.yml
