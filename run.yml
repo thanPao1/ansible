@@ -1,0 +1,127 @@
+---
+# ==============================================================================
+# TASK FILE : nagios-run.yml
+# PROPÓSITO : Dar de alta el host en Nagios XI via API
+#             SIN crear servicios de monitoreo
+# FLUJO:
+#   1. Verificar si el host ya existe
+#   2. Crear el host si no existe
+#   3. Aplicar configuración (reload)
+# ==============================================================================
+
+- name: "Nagios | Bloque principal de registro de host"
+  block:
+
+    # --------------------------------------------------------------------------
+    # STEP 1: Verificar si el host ya existe en Nagios
+    # --------------------------------------------------------------------------
+    - name: "CHECK | Verificar si el host ya existe en Nagios XI"
+      ansible.builtin.uri:
+        url:            "{{ nagios_host }}/nagiosxi/api/v1/config/host?apikey={{ nagios_api_token }}&host_name={{ host_name }}"
+        method:         GET
+        validate_certs: false
+        status_code:    [200, 404]
+        timeout:        30
+      register: nagios_check_response
+
+    - name: "CHECK | Establecer flag si el host ya existe"
+      ansible.builtin.set_fact:
+        host_already_exists: >-
+          {{ nagios_check_response.status == 200 and
+             nagios_check_response.json.records is defined and
+             nagios_check_response.json.records | int > 0 }}
+
+    - name: "CHECK | Informar si el host ya existe"
+      ansible.builtin.debug:
+        msg: "AVISO: El host {{ host_name }} ya existe en Nagios XI — se omite la creacion"
+      when: host_already_exists | bool
+
+    # --------------------------------------------------------------------------
+    # STEP 2: Crear el host si NO existe
+    # Solo da de alta el host en el hostgroup — NO crea servicios
+    # --------------------------------------------------------------------------
+    - name: "CREATE | Dar de alta host en Nagios XI"
+      ansible.builtin.uri:
+        url:            "{{ nagios_host }}/nagiosxi/api/v1/config/host?apikey={{ nagios_api_token }}"
+        method:         POST
+        validate_certs: false
+        headers:
+          Content-Type: "application/json"
+        body_format: json
+        body:
+          host_name:             "{{ host_name }}"
+          address:               "{{ host_ip }}"
+          alias:                 "{{ host_alias }}"
+          use:                   "{{ nagios_host_template }}"
+          hostgroups:            "{{ nagios_hostgroup }}"
+          contacts:              "{{ nagios_contacts }}"
+          notifications_enabled: "{{ nagios_notifications_enabled }}"
+          register:              "1"
+        status_code: [200, 201]
+        timeout:     30
+      register:  nagios_create_response
+      when:      not host_already_exists | bool
+
+    - name: "CREATE | Confirmar creacion del host"
+      ansible.builtin.set_fact:
+        nagios_host_created: true
+      when: not host_already_exists | bool
+
+    - name: "CREATE | Mostrar resultado de creacion"
+      ansible.builtin.debug:
+        msg: "Host {{ host_name }} creado exitosamente en Nagios XI"
+      when: not host_already_exists | bool
+
+    # --------------------------------------------------------------------------
+    # STEP 3: Aplicar configuracion en Nagios (reload)
+    # --------------------------------------------------------------------------
+    - name: "APPLY | Aplicar configuracion en Nagios XI"
+      ansible.builtin.uri:
+        url:            "{{ nagios_host }}/nagiosxi/api/v1/system/applyconfig?apikey={{ nagios_api_token }}"
+        method:         POST
+        validate_certs: false
+        status_code:    [200, 201]
+        timeout:        60
+      register: nagios_apply_response
+      when:     not host_already_exists | bool
+
+    - name: "APPLY | Confirmar aplicacion de configuracion"
+      ansible.builtin.debug:
+        msg: |
+          ================================================================
+           Nagios XI | Host Registrado Exitosamente
+          ----------------------------------------------------------------
+           Host Name  : {{ host_name }}
+           Alias      : {{ host_alias }}
+           IP Address : {{ host_ip }}
+           Hostgroup  : {{ nagios_hostgroup }}
+           Template   : {{ nagios_host_template }}
+           Servicios  : NO creados (solo alta de host)
+          ================================================================
+      when: not host_already_exists | bool
+
+  # --------------------------------------------------------------------------
+  # RESCUE: Captura errores y levanta bandera para el reporte
+  # --------------------------------------------------------------------------
+  rescue:
+    - name: "ERROR | Registrar fallo de ejecucion"
+      ansible.builtin.set_fact:
+        host_failed:        true
+        host_error_message: "{{ ansible_failed_result.msg | default('Error desconocido') }}"
+        host_failed_task:   "{{ ansible_failed_task.name | default('N/A') }}"
+
+    - name: "ERROR | Log del fallo"
+      ansible.builtin.debug:
+        msg: "FALLO en: {{ host_failed_task }} | Error: {{ host_error_message }}"
+
+  # --------------------------------------------------------------------------
+  # ALWAYS: Escribir reporte CSV independientemente del resultado
+  # --------------------------------------------------------------------------
+  always:
+    - name: "REPORT | Escribir reporte de estado"
+      ansible.builtin.copy:
+        content: |
+          "host_name","host_ip","host_alias","status","already_existed","failed_task","error_message"
+          "{{ host_name }}","{{ host_ip }}","{{ host_alias }}","{{ 'FAILED' if host_failed | default(false) else 'SUCCESS' }}","{{ host_already_exists | default(false) }}","{{ host_failed_task | default('N/A') }}","{{ host_error_message | default('') | replace('"', '""') | replace('\n', ' ') }}"
+        dest:    "{{ hostvars['localhost'].local_fetch_path }}/status_report_{{ host_name }}.csv"
+      changed_when: false
