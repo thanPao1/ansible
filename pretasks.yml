@@ -1,0 +1,44 @@
+---
+# ==============================================================================
+# TASK FILE : nagios-pretasks.yml
+# PROPÓSITO : Inicializar facts globales y verificar conectividad a Nagios XI
+# ==============================================================================
+
+- name: "PRE | Establecer facts globales del reporte"
+  ansible.builtin.set_fact:
+    local_fetch_path:         "{{ local_fetch_path }}"
+    consolidated_report_name: "{{ consolidated_report_name }}"
+    execution_epoch:          "{{ now(utc=True, fmt='%s') }}"
+    host_failed:              false
+    host_error_message:       ""
+    host_failed_task:         ""
+    nagios_host_created:      false
+
+- name: "PRE | Crear directorio local temporal para reportes"
+  ansible.builtin.file:
+    path:  "{{ local_fetch_path }}"
+    state: directory
+    mode:  '0755'
+
+- name: "PRE | Obtener fecha/hora de ejecucion"
+  delegate_facts: true
+  ansible.builtin.setup:
+    gather_subset:
+      - date_time
+
+- name: "PRE | Sobreescribir execution_epoch con valor entero"
+  ansible.builtin.set_fact:
+    execution_epoch: "{{ ansible_date_time.epoch_int }}"
+
+- name: "PRE | Verificar conectividad HTTPS a Nagios XI"
+  ansible.builtin.uri:
+    url:            "{{ nagios_host }}/nagiosxi/api/v1/system/status?apikey={{ nagios_api_token }}"
+    method:         GET
+    validate_certs: false
+    status_code:    200
+    timeout:        15
+  register: nagios_connectivity_check
+
+- name: "PRE | Confirmar conectividad a Nagios XI"
+  ansible.builtin.debug:
+    msg: "Nagios XI alcanzable. Status: {{ nagios_connectivity_check.json.status | default('OK') }}"
