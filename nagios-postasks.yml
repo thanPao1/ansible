@@ -1,0 +1,31 @@
+---
+# ==============================================================================
+# TASK FILE : nagios-postasks.yml
+# PROPÓSITO : Consolidar reporte CSV y limpiar archivos temporales
+#             Mismo patrón que cyberark-user-creation-postasks.yml
+# ==============================================================================
+
+- name: "POST | Crear reporte consolidado con encabezado"
+  ansible.builtin.copy:
+    content: "host_name,host_ip,host_alias,status,already_existed,failed_task,error_message\n"
+    dest:    "{{ hostvars['localhost'].local_fetch_path }}/{{ hostvars['localhost'].consolidated_report_name }}"
+
+- name: "POST | Consolidar todos los reportes de ejecucion"
+  ansible.builtin.shell:
+    cmd: >
+      tail -n +2 {{ hostvars['localhost'].local_fetch_path }}/status_report_*.csv >>
+      {{ hostvars['localhost'].local_fetch_path }}/{{ hostvars['localhost'].consolidated_report_name }} || true
+  changed_when: false
+
+- name: "POST | Subir reporte consolidado a Google Cloud Storage"
+  google.cloud.gcp_storage_object:
+    bucket:  "sit-devops-repository-bkt02"
+    src:     "{{ hostvars['localhost'].local_fetch_path }}/{{ hostvars['localhost'].consolidated_report_name }}"
+    dest:    "reporte-nagios/{{ hostvars['localhost'].execution_epoch }}-nagios-report.csv"
+    project: "sit-devops-repository"
+    action:  upload
+
+- name: "POST | Limpiar directorio temporal del controller"
+  ansible.builtin.file:
+    path:  "{{ hostvars['localhost'].local_fetch_path }}"
+    state: absent
