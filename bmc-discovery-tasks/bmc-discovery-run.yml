@@ -28,6 +28,29 @@
     - name: "AUTH | Confirmar autenticacion exitosa"
       ansible.builtin.debug:
         msg: "Autenticacion exitosa en BMC Helix Discovery"
+##nuevo para determinar el outpost a donde pertenece
+     - name: "OUTPOST | Determinar Outpost para {{ target_ip }}"
+      ansible.builtin.set_fact:
+        target_outpost: "{{ item.0.outpost }}"
+        target_segment: "{{ item.1 }}"
+      loop: "{{ discovery_routes | subelements('segments') }}"
+      when: target_ip | ansible.utils.ipaddr(item.1)
+
+    - name: "OUTPOST | Validar asignación"
+      ansible.builtin.assert:
+        that:
+          - target_outpost is defined
+          - target_segment is defined
+        fail_msg: >-
+          La IP {{ target_ip }} no pertenece a ningún segmento configurado.
+
+    - name: "OUTPOST | Mostrar asignación"
+      ansible.builtin.debug:
+        msg: >-
+          IP {{ target_ip }} →
+          Segmento {{ target_segment }} →
+          Outpost {{ target_outpost }}
+
 
     - name: "SCAN | Crear Adhoc Discovery Run para {{ target_ip }}"
       ansible.builtin.uri:
@@ -39,7 +62,7 @@
         body_format:      json
         body:
           label:     "Ansible-Adhoc-{{ target_ip }}-{{ execution_epoch }}"
-          ranges:    ["{{ target_ip }}/32"]
+          ranges:    ["{{ target_ip }}"]
           scan_kind: "IP"
         validate_certs:   true
         follow_redirects: all
