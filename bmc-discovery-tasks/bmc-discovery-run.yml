@@ -1,291 +1,50 @@
-# 1. Autenticación a token Bearer
-# 2. Crear discovery run para target_ip
-# 3. Polling hasta estado terminal
-# 4. Consultar resultados
 ---
-- name: "BMC Discovery run"
+- name: "BMC Discovery | Bloque principal de ejecucion"
   block:
 
-    # 1: Obtencion de token para autenticación
-
-    #Token permanente
-#    - name: "BMC Discovery | Bloque principal de ejecución"
-#    blok:
-#    -name: "AUTH | Establecer token permanente desde AAP Vault"
-#      ansible.builtin.set_fact:
- #       bmc_token: "{{ bmc_api_token }}"
- #     no_log: true
-    
-    # Token temporal
-    - name: "AUTH  | Token temporal de BMC"
+    - name: "AUTH | Obtener token de BMC Helix Discovery"
       ansible.builtin.uri:
-        url: "{{ bmc_discovery_host }}/api/token"
-        method: POST
-        body_format: form-urlencoded
+        url:            "https://liverpool-disc-itom.onbmc.com/api/token"
+        method:         POST
+        headers:
+          Content-Type: "application/x-www-form-urlencoded"
+        body_format:    form-urlencoded
         body:
           grant_type: "password"
-          username: "{{ bmc_api_password }}"
-        validate_certs: true
-        status_code: 200
-        timeout: 30
+          username:   "{{ bmc_api_user }}"
+          password:   "{{ bmc_api_password }}"
+        validate_certs:   true
+        follow_redirects: all
+        status_code:      200
+        timeout:          30
       register: bmc_auth_response
-      no_log: true  
-      #version anterior 
-#        url:  "{{ bmc_discovery_host }}/api/v1.0/vault/credentials/ADDM"
-#        method: POST
-#        body_format: json
-#        body:
-#          username: "{{ bmc_api_user }}"
-#          password: "{{ bmc_api_password }}"
-#        validate_certs:   true
-#        status_code:      200
-#        timeout:          30
-#      register: bmc_auth_response
-#      no_log: true  
+      no_log:   true
 
-    - name: "AUTH | Guardar token fact"
+    - name: "AUTH | Guardar token en fact"
       ansible.builtin.set_fact:
         bmc_token: "{{ bmc_auth_response.json.access_token }}"
       no_log: true
-    
 
-# 2: Verificación que el token es válido antes de hacer el scan 
-    - name: "AUTH | validación token"
-      ansible.builtin.uri:
-        url: "{{ bmc_auth_host }}/api/{{ bmc_api_version }}/discovery"
-        method: GET
-        headers:
-          Authorization: "Bearer {{ bmc_token }}"
-        validate_certs: true
-        status_code: 200
-        timeout: 20
-      registrer: bmc_token_check
-      no_log: true
-
-    - name: "AUTH | Confirma auternticación exitosa"
+    - name: "AUTH | Confirmar autenticacion exitosa"
       ansible.builtin.debug:
-        msg: "Token válido. Estado de Discoery: {{ bmc_token_check.json.status | default('N/A')  }}"
+        msg: "Autenticacion exitosa en BMC Helix Discovery"
 
-
-    # 3: Crear el adhoc discovery para la target_ip
-  
-    - name: "SCAN | Crear Adhoc Discovery para {{ target_ip }}"
-      ansible.builtin.uri:
-        url:     "{{ bmc_discovery_host }}/api/{{ bmc_api_version }}/discovery/runs"
-        method:  POST
-        headers:
-          Authorization: "Bearer {{ bmc_token }}"
-          Content-Type:  "application/json"
-        body_format: json
-        body:
-          label:       "Ansible-Adhoc-{{ target_ip }}-{{ execution_epoch }}"
-          ranges:      ["{{ target_ip }}/32"]
-          scan_kind: "IP"
-          #scan_level:  "{{ scan_level }}"
-        validate_certs: true
-        status_code:    [200, 201, 202]
-        timeout:        30
-      register: bmc_scan_create_response
-
-    - name: "SCAN | Guardar UUID del run creado"
-      ansible.builtin.set_fact:
-        scan_run_id: >
-          "{{ bmc_scan_create_response.json.uuid | default(bmc_scan_create_response.json.id) | defauly('') }}"
-
-    - name: "SCAN | Confirmación de la creación del scan"
-      ansible.builtin.debug:
-        msg: > 
-          Discovery run creado exitosamente| Run ID: {{ scan_run_id }} | Target: {{ target_ip }} | Label: Ansible-Adhoc-{{ target_ip }}-{{ execution_epoch }}
-
-
-    # 4: Polling hasta que el escaneo termine y hay estados del escaneo
-    - name: "POLL | Esperar a que el escaneo termine"
-      ansible.builtin.uri:
-        url:     "{{ bmc_discovery_host }}/api/{{ bmc_api_version }}/discovery/runs/{{ scan_run_id }}"
-        method:  GET
-        headers:
-          Authorization: "Bearer {{ bmc_token }}"
-        validate_certs: true
-        status_code:    200
-        timeout:        30
-      register:     bmc_poll_response
-      until:        bmc_poll_response.json.status in ['Success', 'Completed', 'Failed', 'Cancelled', 'Error']
-      retries:      "{{ poll_max_retries }}"
-      delay:        "{{ poll_interval_seconds }}"
-
-    - name: "POLL | Guardar el estado final del escaneo"
-      ansible.builtin.set_fact:
-        scan_final_status: "{{ bmc_poll_response.json.status }}"
-
-    - name: "POLL | Fallo si el escaneo termina en error"
-      ansible.builtin.fail:
-        msg: "BMC Discovery scan {{ scan_run_id }} ended with status: {{ scan_final_status }}"
-      when: scan_final_status in ['Failed', 'Cancelled', 'Error']
-
-    # 5: Consultar resultados del scan
-    - name: "RESULT | Consultar resultados del Discovery {{ target_ip }}"
-      ansible.builtin.uri:
-        url:     "{{ bmc_discovery_host }}/api/{{ bmc_api_version }}/discovery/runs/{{ scan_run_id }}/results"
-        method:  GET
-        headers:
-          Authorization: "Bearer {{ bmc_token }}"
-        validate_certs: true
-        status_code:    200
-        timeout:        30
-      register: bmc_results_response
-
-    - name: "RESULT | Guardar resumen de los resultados"
-      ansible.builtin.set_fact:
-        scan_results_summary: "{{ bmc_results_response.json }}"
-        scan_devices_found: "{{ bmc_results_response.json.total | default (0) }}"
-
-    - name: "RESULT | Mostrar resumen de los resultados"
-      ansible.builtin.debug:
-        msg: |
-          ------------------------------------------------------------
-          BMC Discovery Scan Completado
-          ------------------------------------------------------------
-          Target IP    : {{ target_ip }}
-          Run ID       : {{ scan_run_id }}
-          Estado final : {{ scan_final_status }}
-          Dispositivos : {{ scan_devices_found }}
-          Epocas       : {{ execution_epoch }}
-          ------------------------------------------------------------
-
-  #Captura errores y levanta bandera
-  rescue:
-    - name: "ERROR | Registro de fallo de ejecución"
-      ansible.builtin.set_fact:
-        scan_failed:        true
-        scan_error_message: "{{ ansible_failed_result.msg | default('Error desconocido') }}"
-        scan_failed_task:   "{{ ansible_failed_task.name | default('N/A') }}"
-
-    - name: "ERROR | Log del fallo"
-      ansible.builtin.debug:
-        msg: "Escaneo fallido en la tarea: {{ scan_failed_task }} | Error: {{ scan_error_message }}"
-
-  # Escribir reporte local independientemente del resultado
-  always:
-    - name: "REPORT | Write execution status report"
-      ansible.builtin.copy:
-        content: |
-          "target_ip","run_id","final_status","failed_task","error_message"
-          "{{ target_ip }}","{{ scan_run_id | default('N/A') }}","{{ 'FAILED' if scan_failed | default(false) else scan_final_status }}","{{ scan_failed_task | default('N/A') }}","{{ scan_error_message | default('') | replace('"', '""') | replace('\n', ' ') }}"
-        dest:    "{{ hostvars['localhost'].local_fetch_path }}/status_report_{{ target_ip | replace('.', '_') }}.csv"
-      changed_when: false
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-# ==============================================================================
-# TASK FILE : bmc-discovery-run.yml
-# PROPÓSITO : Flujo completo de Adhoc Discovery:
-#             1. Autenticación → token Bearer
-#             2. Crear discovery run para target_ip
-#             3. Polling hasta estado terminal
-#             4. Consultar resultados
-# NOTAS     : Se usa token PERMANENTE (recomendación oficial BMC para scripts
-#             automatizados). Si se prefiere token temporal, descomentar
-#             el bloque de autenticación con usuario/password.
-# ==============================================================================
-
-- name: "BMC Discovery | Bloque principal de ejecución"
-  block:
-
-    # --------------------------------------------------------------------------
-    # OPCIÓN A (RECOMENDADA): Token permanente desde AAP Vault
-    # El token fue generado en: BMC UI → Administration → Users → <usuario> → API Token
-    # Se almacena en vars/bmc-discovery-secrets.yml como bmc_api_token (vault)
-    # --------------------------------------------------------------------------
-    - name: "AUTH | Establecer token permanente desde AAP Vault"
-      ansible.builtin.set_fact:
-        bmc_token: "{{ bmc_api_token }}"
-      no_log: true
-
-    # --------------------------------------------------------------------------
-    # OPCIÓN B (ALTERNATIVA): Token temporal via usuario/password
-    # Descomentar si se decide NO usar token permanente.
-    # Tokens temporales expiran en 1 hora (suficiente para el job).
-    # Referencia BMC: POST /api/token con grant_type=password (form-data, NO JSON)
-    # --------------------------------------------------------------------------
-    # - name: "AUTH | Obtener token temporal de BMC Helix Discovery"
-    #   ansible.builtin.uri:
-    #     url:            "{{ bmc_discovery_host }}/api/token"
-    #     method:         POST
-    #     body_format:    form-urlencoded      # ← IMPORTANTE: form-data, no JSON
-    #     body:
-    #       grant_type: "password"
-    #       username:   "{{ bmc_api_user }}"
-    #       password:   "{{ bmc_api_password }}"
-    #     validate_certs: true
-    #     status_code:    200
-    #     timeout:        30
-    #   register:  bmc_auth_response
-    #   no_log:    true
-    #
-    # - name: "AUTH | Guardar token en fact"
-    #   ansible.builtin.set_fact:
-    #     bmc_token: "{{ bmc_auth_response.json.access_token }}"
-    #   no_log: true
-
-    # --------------------------------------------------------------------------
-    # STEP 1: Verificar que el token es válido antes de crear el scan
-    # --------------------------------------------------------------------------
-    - name: "AUTH | Verificar validez del token"
-      ansible.builtin.uri:
-        url:     "{{ bmc_discovery_host }}/api/{{ bmc_api_version }}/discovery"
-        method:  GET
-        headers:
-          Authorization: "Bearer {{ bmc_token }}"
-        validate_certs: true
-        status_code:    200
-        timeout:        15
-      register: bmc_token_check
-      no_log:   true
-
-    - name: "AUTH | Confirmar autenticación exitosa"
-      ansible.builtin.debug:
-        msg: "Token válido. Estado Discovery: {{ bmc_token_check.json.status | default('N/A') }}"
-
-    # --------------------------------------------------------------------------
-    # STEP 2: Crear el Adhoc Discovery Run para target_ip
-    # Endpoint: POST /api/v1.1/discovery/runs
-    # scan_kind "IP" = Adhoc scan de rango IP (equivalente a Scan Range API)
-    # --------------------------------------------------------------------------
     - name: "SCAN | Crear Adhoc Discovery Run para {{ target_ip }}"
       ansible.builtin.uri:
-        url:     "{{ bmc_discovery_host }}/api/{{ bmc_api_version }}/discovery/runs"
+        url:     "https://liverpool-disc-itom.onbmc.com/api/{{ bmc_api_version }}/discovery/runs"
         method:  POST
         headers:
           Authorization: "Bearer {{ bmc_token }}"
           Content-Type:  "application/json"
-        body_format: json
+        body_format:      json
         body:
           label:     "Ansible-Adhoc-{{ target_ip }}-{{ execution_epoch }}"
-          ranges:    ["{{ target_ip }}/32"]      # /32 = host único
+          ranges:    ["{{ target_ip }}/32"]
           scan_kind: "IP"
-        validate_certs: true
-        status_code:    [200, 201, 202]
-        timeout:        30
+        validate_certs:   true
+        follow_redirects: all
+        status_code:      [200, 201, 202]
+        timeout:          30
       register: bmc_scan_create_response
 
     - name: "SCAN | Guardar UUID del run creado"
@@ -295,27 +54,20 @@
              | default(bmc_scan_create_response.json.id)
              | default('') }}
 
-    - name: "SCAN | Confirmar creación del scan"
+    - name: "SCAN | Confirmar creacion del scan"
       ansible.builtin.debug:
-        msg: >
-          Discovery Run creado exitosamente.
-          Run ID : {{ scan_run_id }}
-          Target : {{ target_ip }}
-          Label  : Ansible-Adhoc-{{ target_ip }}-{{ execution_epoch }}
+        msg: "Discovery Run creado | Run ID: {{ scan_run_id }} | Target: {{ target_ip }}"
 
-    # --------------------------------------------------------------------------
-    # STEP 3: Polling hasta que el scan llegue a estado terminal
-    # Estados terminales BMC: Success / Completed / Failed / Cancelled / Error
-    # --------------------------------------------------------------------------
     - name: "POLL | Esperar a que el Discovery Run termine"
       ansible.builtin.uri:
-        url:     "{{ bmc_discovery_host }}/api/{{ bmc_api_version }}/discovery/runs/{{ scan_run_id }}"
+        url:     "https://liverpool-disc-itom.onbmc.com/api/{{ bmc_api_version }}/discovery/runs/{{ scan_run_id }}"
         method:  GET
         headers:
           Authorization: "Bearer {{ bmc_token }}"
-        validate_certs: true
-        status_code:    200
-        timeout:        30
+        validate_certs:   true
+        follow_redirects: all
+        status_code:      200
+        timeout:          30
       register: bmc_poll_response
       until: >
         bmc_poll_response.json.status is defined and
@@ -327,31 +79,27 @@
       ansible.builtin.set_fact:
         scan_final_status: "{{ bmc_poll_response.json.status }}"
 
-    - name: "POLL | Fallar si el scan terminó en error"
+    - name: "POLL | Fallar si el scan termino en error"
       ansible.builtin.fail:
-        msg: >
-          BMC Discovery Run {{ scan_run_id }} terminó con estado: {{ scan_final_status }}.
-          Revisar logs en: {{ bmc_discovery_host }}/ui/discovery/runs/{{ scan_run_id }}
+        msg: "BMC Discovery Run {{ scan_run_id }} termino con estado: {{ scan_final_status }}"
       when: scan_final_status in ['Failed', 'Cancelled', 'Error']
 
-    # --------------------------------------------------------------------------
-    # STEP 4: Consultar resultados del scan completado
-    # --------------------------------------------------------------------------
     - name: "RESULT | Consultar resultados del Discovery Run"
       ansible.builtin.uri:
-        url:     "{{ bmc_discovery_host }}/api/{{ bmc_api_version }}/discovery/runs/{{ scan_run_id }}/results"
+        url:     "https://liverpool-disc-itom.onbmc.com/api/{{ bmc_api_version }}/discovery/runs/{{ scan_run_id }}/results"
         method:  GET
         headers:
           Authorization: "Bearer {{ bmc_token }}"
-        validate_certs: true
-        status_code:    200
-        timeout:        30
+        validate_certs:   true
+        follow_redirects: all
+        status_code:      200
+        timeout:          30
       register: bmc_results_response
 
     - name: "RESULT | Guardar resumen de resultados"
       ansible.builtin.set_fact:
-        scan_results_summary: "{{ bmc_results_response.json }}"
-        scan_devices_found:   "{{ bmc_results_response.json.total | default(0) }}"
+        scan_final_status:  "{{ bmc_poll_response.json.status }}"
+        scan_devices_found: "{{ bmc_results_response.json.total | default(0) }}"
 
     - name: "RESULT | Mostrar resumen del Discovery"
       ansible.builtin.debug:
@@ -359,18 +107,14 @@
           ================================================================
            BMC Helix Discovery | Scan Completado
           ----------------------------------------------------------------
-           Target IP      : {{ target_ip }}
-           Run ID         : {{ scan_run_id }}
-           Estado Final   : {{ scan_final_status }}
-           Dispositivos   : {{ scan_devices_found }}
-           Epoch Ejecución: {{ execution_epoch }}
+           Target IP    : {{ target_ip }}
+           Run ID       : {{ scan_run_id }}
+           Estado Final : {{ scan_final_status }}
+           Dispositivos : {{ scan_devices_found }}
           ================================================================
 
-  # --------------------------------------------------------------------------
-  # RESCUE: Captura cualquier fallo y levanta bandera para el reporte
-  # --------------------------------------------------------------------------
   rescue:
-    - name: "ERROR | Registrar fallo de ejecución"
+    - name: "ERROR | Registrar fallo de ejecucion"
       ansible.builtin.set_fact:
         scan_failed:        true
         scan_error_message: "{{ ansible_failed_result.msg | default('Error desconocido') }}"
@@ -378,24 +122,13 @@
 
     - name: "ERROR | Log del fallo"
       ansible.builtin.debug:
-        msg: |
-          ================================================================
-           BMC Helix Discovery | FALLO EN EJECUCIÓN
-          ----------------------------------------------------------------
-           Target IP  : {{ target_ip }}
-           Run ID     : {{ scan_run_id | default('NO CREADO') }}
-           Task Falla : {{ scan_failed_task }}
-           Error      : {{ scan_error_message }}
-          ================================================================
+        msg: "FALLO en: {{ scan_failed_task }} | Error: {{ scan_error_message }}"
 
-  # --------------------------------------------------------------------------
-  # ALWAYS: Escribir reporte CSV local — se ejecuta sin importar éxito o fallo
-  # --------------------------------------------------------------------------
   always:
-    - name: "REPORT | Escribir reporte de estado en el controller"
+    - name: "REPORT | Escribir reporte de estado"
       ansible.builtin.copy:
         content: |
           "target_ip","run_id","final_status","devices_found","failed_task","error_message"
           "{{ target_ip }}","{{ scan_run_id | default('N/A') }}","{{ 'FAILED' if scan_failed | default(false) else scan_final_status | default('N/A') }}","{{ scan_devices_found | default('N/A') }}","{{ scan_failed_task | default('N/A') }}","{{ scan_error_message | default('') | replace('"', '""') | replace('\n', ' ') }}"
-        dest:    "{{ hostvars['localhost'].local_fetch_path }}/status_report_{{ target_ip | replace('.', '_') }}.csv"
+        dest: "{{ hostvars['localhost'].local_fetch_path }}/status_report_{{ target_ip | replace('.', '_') }}.csv"
       changed_when: false
