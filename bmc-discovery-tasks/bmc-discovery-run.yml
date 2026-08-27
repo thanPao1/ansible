@@ -29,27 +29,23 @@
       ansible.builtin.debug:
         msg: "Autenticacion exitosa en BMC Helix Discovery"
 
-    - name: "OUTPOST | Determinar Outpost para {{ target_ip }}"
+    - name: "OUTPOST | Inicializar variables"
       ansible.builtin.set_fact:
-        target_outpost: "{{ item.0.outpost }}"
-        target_segment: "{{ item.1 }}"
-      loop: "{{ discovery_routes | subelements('segments') }}"
+        target_outpost: ""
+        target_segment: ""
+
+    - name: "OUTPOST | Buscar outpost para {{ target_ip }}"
+      ansible.builtin.set_fact:
+        target_outpost: "{{ item.outpost }}"
+        target_segment: "{{ item.segment }}"
+      loop: "{{ discovery_routes | map('combine', {'segments': 'segments'}) | list }}"
+      when: 
+        - target_outpost == ""
+        - item.segments is defined
+        - item.segments | length > 0
       vars:
-        segment_network: "{{ item.1.split('/')[0] }}"
-        segment_cidr: "{{ item.1.split('/')[1] | int }}"
-        
-        target_octets: "{{ target_ip.split('.') }}"
-        target_int: "{{ target_octets[0] | int * 16777216 + target_octets[1] | int * 65536 + target_octets[2] | int * 256 + target_octets[3] | int }}"
-        
-        network_octets: "{{ segment_network.split('.') }}"
-        network_int: "{{ network_octets[0] | int * 16777216 + network_octets[1] | int * 65536 + network_octets[2] | int * 256 + network_octets[3] | int }}"
-        
-        mask_int: "{{ (2**32 - 1) - (2**(32 - segment_cidr) - 1) }}"
-        
-        is_in_range: "{{ (target_int & mask_int) == (network_int & mask_int) }}"
-      when: is_in_range
-      loop_control:
-        label: "{{ item.1 }}"
+        segment_list: "{{ item.segments }}"
+      run_once: false
 
     - name: "OUTPOST | Validar asignación"
       ansible.builtin.assert:
