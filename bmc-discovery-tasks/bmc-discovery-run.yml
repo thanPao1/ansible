@@ -34,7 +34,10 @@
         target_outpost: "{{ item.0.outpost }}"
         target_segment: "{{ item.1 }}"
       loop: "{{ discovery_routes | subelements('segments') }}"
-      when: item.1 | ansible.utils.ipaddr(target_ip)
+      when: >-
+        {{ target_ip | ansible.builtin.ipaddr('address') }}
+        is in
+        {{ item.1 | ansible.builtin.ipaddr('network') }}
 
     - name: "OUTPOST | Validar asignación"
       ansible.builtin.assert:
