@@ -29,7 +29,7 @@
       ansible.builtin.debug:
         msg: "Autenticacion exitosa en BMC Helix Discovery"
 ##nuevo para determinar el outpost a donde pertenece
-     - name: "OUTPOST | Determinar Outpost para {{ target_ip }}"
+    - name: "OUTPOST | Determinar Outpost para {{ target_ip }}"
       ansible.builtin.set_fact:
         target_outpost: "{{ item.0.outpost }}"
         target_segment: "{{ item.1 }}"
