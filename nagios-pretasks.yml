@@ -1,9 +1,4 @@
 ---
-# ==============================================================================
-# TASK FILE : nagios-pretasks.yml
-# PROPÓSITO : Inicializar facts globales y verificar conectividad a Nagios XI
-# ==============================================================================
-
 - name: "PRE | Establecer facts globales del reporte"
   ansible.builtin.set_fact:
     local_fetch_path:         "{{ local_fetch_path }}"
