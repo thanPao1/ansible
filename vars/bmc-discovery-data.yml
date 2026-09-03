@@ -271,7 +271,7 @@ discovery_routes:
         
      - outpost: "STFBMCPAP01_Zona_Segura"
        segments:
-       - "172.22.0.0/16"
+         - "172.22.0.0/16"
       
 
       
