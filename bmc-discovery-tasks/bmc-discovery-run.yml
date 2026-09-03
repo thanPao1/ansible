@@ -123,22 +123,33 @@
         timeout:          30
       register: bmc_poll_response
       until: >
-        bmc_poll_response.json.status is defined and
-        bmc_poll_response.json.status | lower not in
-          ['running', 'pending', 'processing', 'queued', 'in_progress', 'scanning']
+        bmc_poll_response.json.finished is defined and
+        bmc_poll_response.json.finished | bool and
+        not (bmc_poll_response.json.consolidating | default(false) | bool)
       retries: "{{ poll_max_retries }}"
       delay:   "{{ poll_interval_seconds }}"
 
     - name: "POLL | Guardar estado final del scan"
       ansible.builtin.set_fact:
-        scan_final_status: "{{ bmc_poll_response.json.status }}"
+        scan_final_status: "{{ 'Completed' if (bmc_poll_response.json.done | default(0) | int) == 1 else 'Unknown' }}"
 
     - name: "POLL | Mostrar estado final del scan"
       ansible.builtin.debug:
         msg:
           - "Estado final del scan: {{ scan_final_status }}"
           - "Scan ID: {{ scan_run_id }}"
+          - "done={{ bmc_poll_response.json.done }} finished={{ bmc_poll_response.json.finished }}"
 
+    - name: "POLL | Guardar estado final del scan"
+      ansible.builtin.set_fact:
+        scan_final_status: "{{ 'Completed' if (bmc_poll_response.json.done | default(0) | int) == 1 else 'Unknown' }}"
+
+    - name: "POLL | Mostrar estado final del scan"
+      ansible.builtin.debug:
+        msg:
+          - "Estado final del scan: {{ scan_final_status }}"
+          - "Scan ID: {{ scan_run_id }}"
+          - "done={{ bmc_poll_response.json.done }} finished={{ bmc_poll_response.json.finished }}"
     - name: "POLL | Fallar si el scan termino en error"
       ansible.builtin.fail:
         msg: "BMC Discovery Run {{ scan_run_id }} termino con estado: {{ scan_final_status }}"
