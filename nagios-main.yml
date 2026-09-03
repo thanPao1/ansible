@@ -1,18 +1,5 @@
 ---
-# ==============================================================================
-# PLAYBOOK : nagios-main.yml
-# PROPÓSITO: Dar de alta un Host en Nagios XI via REST API
-#            SIN crear servicios de monitoreo
-# EJECUTA EN: localhost (AAP) — NO requiere SSH a ningún host destino
-# VARIABLES SURVEY AAP:
-#   - host_name  → nombre del host (ej. qroplantso8_copy_1)
-#   - host_alias → alias descriptivo (ej. Plantilla)
-#   - host_ip    → IP del host a monitorear (ej. 172.16.202.43)
-# ==============================================================================
-
-# ------------------------------------------------------------------------------
-# PLAY 1 | Pre-flight: validación de variables y setup de facts globales
-# ------------------------------------------------------------------------------
+#Play 1
 - name: "Nagios | Pre-flight checks y setup"
   hosts: localhost
   connection: local
@@ -39,9 +26,8 @@
       ansible.builtin.import_tasks:
         file: nagios-tasks/nagios-pretasks.yml
 
-# ------------------------------------------------------------------------------
-# PLAY 2 | Core: dar de alta el host en Nagios XI
-# ------------------------------------------------------------------------------
+
+# PLAY 2 - dar de alta el host en Nagios XI
 - name: "Nagios | Registrar Host en Nagios XI"
   hosts: localhost
   connection: local
@@ -61,9 +47,7 @@
       ansible.builtin.import_tasks:
         file: nagios-tasks/nagios-run.yml
 
-# ------------------------------------------------------------------------------
-# PLAY 3 | Post-tasks: reporte y limpieza
-# ------------------------------------------------------------------------------
+# PLAY 3- Post-tasks: reporte y limpieza
 - name: "Nagios | Reporte y limpieza"
   hosts: localhost
   connection: local
