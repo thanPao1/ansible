@@ -1,26 +1,13 @@
 ---
-# ==============================================================================
-# VARS FILE : nagios-data.yml
-# PROPÓSITO : Variables de configuracion no sensibles.
-#             Este archivo SI va a GitHub — NO contiene credenciales.
-# ==============================================================================
-
-# ------------------------------------------------------------------------------
-# Conexion a Nagios XI
-# ------------------------------------------------------------------------------
+#CONEXION
 nagios_host: "https://172.16.202.219"
 
-# ------------------------------------------------------------------------------
-# Configuracion fija del host — mismos valores que la estructura define host{}
-# Cambiar aqui si el equipo decide usar otro template o hostgroup
-# ------------------------------------------------------------------------------
+
 nagios_host_template:          "liv-host-linux"
 nagios_hostgroup:              "linux-servers_base"
 nagios_contacts:               "nagiosadmin"
 nagios_notifications_enabled:  "0"
 
-# ------------------------------------------------------------------------------
-# Rutas de reportes
-# ------------------------------------------------------------------------------
+#Rutas para reporte
 local_fetch_path:         "/tmp/ansible_nagios_reports_{{ now(utc=True, fmt='%Y%m%d%H%M%S') }}"
 consolidated_report_name: "report-Nagios-{{ now(utc=True, fmt='%Y-%m-%dT%H%M%SZ') }}.csv"
