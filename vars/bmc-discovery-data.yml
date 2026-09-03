@@ -49,12 +49,12 @@ discovery_routes:
       - "172.17.216.0/24"
       - "172.17.217.0/24"
 
-   - outpost: "MTYBMCPAP03_dmz"
+  - outpost: "MTYBMCPAP03_dmz"
     segments:
       - "201.116.168.0/24"
 
-    - outpost: "MTYBMCPAP05_BranchOffice"
-      segments:
+  - outpost: "MTYBMCPAP05_BranchOffice" 
+    segments:
         - "10.101.4.0/24"
         - "172.22.221.0/24"
         - "10.101.69.0/24"
@@ -72,8 +72,8 @@ discovery_routes:
         - "172.22.220.0/24"
         - "172.22.106.0/24"
         
-    - outpost: "MTYBMCPAP07_Distribuido"
-      segments: 
+  - outpost: "MTYBMCPAP07_Distribuido"
+    segments: 
         - "172.17.156.0/24"
         - "172.17.76.0/24"
         - "172.17.3.0/24"
@@ -247,8 +247,8 @@ discovery_routes:
         - "172.30.127.0/24"
         - "172.29.178.0/24"
     
-    - outpost: "QROBMCPAP01_Zona_Segura"
-      segments:
+  - outpost: "QROBMCPAP01_Zona_Segura"
+    segments:
         - "172.16.200.0/24"
         - "172.16.201.0/24"
         - "172.16.202.0/24"
@@ -259,8 +259,8 @@ discovery_routes:
         - "172.21.209.0/24"
         - "172.16.212.0/24"
         
-     - outpost: "QROBMCPAP02_Segmentacion"
-       segments:
+  - outpost: "QROBMCPAP02_Segmentacion"
+    segments:
         - "172.16.215.0/24"
         - "172.16.218.0/24"
         - "172.16.216.0/24"
@@ -269,9 +269,7 @@ discovery_routes:
         - "172.16.217.0/24"
         - "172.16.221.0/24"
         
-     - outpost: "STFBMCPAP01_Zona_Segura"
-       segments:
+  - outpost: "STFBMCPAP01_Zona_Segura"
+    segments:
          - "172.22.0.0/16"
-      
 
-      
