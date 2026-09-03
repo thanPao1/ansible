@@ -29,38 +29,57 @@
       ansible.builtin.debug:
         msg: "Autenticacion exitosa en BMC Helix Discovery"
 
-    - name: "OUTPOST | Inicializar variables"
-      ansible.builtin.set_fact:
-        target_outpost: ""
-        target_segment: ""
+    - name: "OUTPOST | Obtener lista de Outposts registrados"
+      ansible.builtin.uri:
+        url:     "https://liverpool-disc-itom.onbmc.com/api/{{ bmc_api_version }}/discovery/outposts"
+        method:  GET
+        headers:
+          Authorization: "Bearer {{ bmc_token }}"
+        validate_certs:   true
+        follow_redirects: all
+        status_code:      200
+        timeout:          30
+      register: bmc_outposts_response
 
-    - name: "OUTPOST | Buscar outpost para {{ target_ip }}"
+    - name: "OUTPOST | Construir mapa nombre -> id"
       ansible.builtin.set_fact:
-        target_outpost: "{{ item.outpost }}"
-        target_segment: "{{ item.segment }}"
-      loop: "{{ discovery_routes | map('combine', {'segments': 'segments'}) | list }}"
-      when: 
-        - target_outpost == ""
-        - item.segments is defined
-        - item.segments | length > 0
-      vars:
-        segment_list: "{{ item.segments }}"
-      run_once: false
+        outpost_id_map: "{{ dict(bmc_outposts_response.json | map(attribute='name') | zip(bmc_outposts_response.json | map(attribute='id'))) }}"
 
-    - name: "OUTPOST | Validar asignación"
+    - name: "OUTPOST | Determinar Outpost para {{ target_ip }}"
+      ansible.builtin.set_fact:
+        target_outpost: "{{ item.0.outpost }}"
+        target_segment: "{{ item.1 }}"
+      loop: "{{ discovery_routes | subelements('segments') }}"
+      when: target_ip | ip_in_network(item.1)
+
+    - name: "OUTPOST | Validar asignacion de segmento"
       ansible.builtin.assert:
         that:
           - target_outpost is defined
           - target_segment is defined
         fail_msg: >-
-          La IP {{ target_ip }} no pertenece a ningún segmento configurado.
+          La IP {{ target_ip }} no pertenece a ningun segmento configurado
+          en discovery_routes. Verifica vars/bmc-discovery-data.yml.
 
-    - name: "OUTPOST | Mostrar asignación"
+    - name: "OUTPOST | Resolver outpost_id dinamicamente"
+      ansible.builtin.set_fact:
+        target_outpost_id: "{{ outpost_id_map[target_outpost] | default('') }}"
+
+    - name: "OUTPOST | Validar que el outpost existe en BMC"
+      ansible.builtin.assert:
+        that:
+          - target_outpost_id != ''
+        fail_msg: >-
+          El outpost '{{ target_outpost }}' definido en discovery_routes ya no
+          existe (o cambio de nombre) en BMC Helix Discovery. Verifica
+          /discovery/outposts.
+
+    - name: "OUTPOST | Mostrar asignacion"
       ansible.builtin.debug:
         msg: >-
           IP {{ target_ip }} →
           Segmento {{ target_segment }} →
-          Outpost {{ target_outpost }}
+          Outpost {{ target_outpost }} ({{ target_outpost_id }})
 
     - name: "SCAN | Crear Adhoc Discovery Run para {{ target_ip }}"
       ansible.builtin.uri:
@@ -71,9 +90,10 @@
           Content-Type:  "application/json"
         body_format:      json
         body:
-          label:     "Ansible-Adhoc-{{ target_ip }}-{{ execution_epoch }}"
-          ranges:    ["{{ target_ip }}"]
-          scan_kind: "IP"
+          label:      "Ansible-Adhoc-{{ target_ip }}-{{ execution_epoch }}"
+          ranges:     ["{{ target_ip }}"]
+          scan_kind:  "IP"
+          outpost_id: "{{ target_outpost_id }}"
         validate_certs:   true
         follow_redirects: all
         status_code:      [200, 201, 202]
@@ -89,7 +109,7 @@
 
     - name: "SCAN | Confirmar creacion del scan"
       ansible.builtin.debug:
-        msg: "Discovery Run creado | Run ID: {{ scan_run_id }} | Target: {{ target_ip }}"
+        msg: "Discovery Run creado | Run ID: {{ scan_run_id }} | Target: {{ target_ip }} | Outpost: {{ target_outpost }}"
 
     - name: "POLL | Esperar a que el Discovery Run termine"
       ansible.builtin.uri:
@@ -104,7 +124,8 @@
       register: bmc_poll_response
       until: >
         bmc_poll_response.json.status is defined and
-        bmc_poll_response.json.status in ['Success', 'Completed', 'Failed', 'Cancelled', 'Error']
+        bmc_poll_response.json.status | lower not in
+          ['running', 'pending', 'processing', 'queued', 'in_progress', 'scanning']
       retries: "{{ poll_max_retries }}"
       delay:   "{{ poll_interval_seconds }}"
 
@@ -112,10 +133,16 @@
       ansible.builtin.set_fact:
         scan_final_status: "{{ bmc_poll_response.json.status }}"
 
+    - name: "POLL | Mostrar estado final del scan"
+      ansible.builtin.debug:
+        msg:
+          - "Estado final del scan: {{ scan_final_status }}"
+          - "Scan ID: {{ scan_run_id }}"
+
     - name: "POLL | Fallar si el scan termino en error"
       ansible.builtin.fail:
         msg: "BMC Discovery Run {{ scan_run_id }} termino con estado: {{ scan_final_status }}"
-      when: scan_final_status in ['Failed', 'Cancelled', 'Error']
+      when: scan_final_status | lower in ['failed', 'cancelled', 'error']
 
     - name: "RESULT | Consultar resultados del Discovery Run"
       ansible.builtin.uri:
@@ -131,7 +158,6 @@
 
     - name: "RESULT | Guardar resumen de resultados"
       ansible.builtin.set_fact:
-        scan_final_status:  "{{ bmc_poll_response.json.status }}"
         scan_devices_found: "{{ bmc_results_response.json.total | default(0) }}"
 
     - name: "RESULT | Mostrar resumen del Discovery"
@@ -141,6 +167,7 @@
            BMC Helix Discovery | Scan Completado
           ----------------------------------------------------------------
            Target IP    : {{ target_ip }}
+           Outpost      : {{ target_outpost }}
            Run ID       : {{ scan_run_id }}
            Estado Final : {{ scan_final_status }}
            Dispositivos : {{ scan_devices_found }}
@@ -161,7 +188,7 @@
     - name: "REPORT | Escribir reporte de estado"
       ansible.builtin.copy:
         content: |
-          "target_ip","run_id","final_status","devices_found","failed_task","error_message"
-          "{{ target_ip }}","{{ scan_run_id | default('N/A') }}","{{ 'FAILED' if scan_failed | default(false) else scan_final_status | default('N/A') }}","{{ scan_devices_found | default('N/A') }}","{{ scan_failed_task | default('N/A') }}","{{ scan_error_message | default('') | replace('"', '""') | replace('\n', ' ') }}"
+          "target_ip","outpost","run_id","final_status","devices_found","failed_task","error_message"
+          "{{ target_ip }}","{{ target_outpost | default('N/A') }}","{{ scan_run_id | default('N/A') }}","{{ 'FAILED' if scan_failed | default(false) else scan_final_status | default('N/A') }}","{{ scan_devices_found | default('N/A') }}","{{ scan_failed_task | default('N/A') }}","{{ scan_error_message | default('') | replace('"', '""') | replace('\n', ' ') }}"
         dest: "{{ hostvars['localhost'].local_fetch_path }}/status_report_{{ target_ip | replace('.', '_') }}.csv"
       changed_when: false
