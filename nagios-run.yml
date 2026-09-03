@@ -1,20 +1,8 @@
 ---
-# ==============================================================================
-# TASK FILE : nagios-run.yml
-# PROPÓSITO : Dar de alta el host en Nagios XI via API
-#             SIN crear servicios de monitoreo
-# FLUJO:
-#   1. Verificar si el host ya existe
-#   2. Crear el host si no existe
-#   3. Aplicar configuración (reload)
-# ==============================================================================
-
 - name: "Nagios | Bloque principal de registro de host"
   block:
 
-    # --------------------------------------------------------------------------
-    # STEP 1: Verificar si el host ya existe en Nagios
-    # --------------------------------------------------------------------------
+    # Verificar si el host ya existe en Nagios
     - name: "CHECK | Verificar si el host ya existe en Nagios XI"
       ansible.builtin.uri:
         url:            "{{ nagios_host }}/nagiosxi/api/v1/config/host?apikey={{ nagios_api_token }}&host_name={{ host_name }}"
@@ -36,10 +24,7 @@
         msg: "AVISO: El host {{ host_name }} ya existe en Nagios XI — se omite la creacion"
       when: host_already_exists | bool
 
-    # --------------------------------------------------------------------------
-    # STEP 2: Crear el host si NO existe
-    # Solo da de alta el host en el hostgroup — NO crea servicios
-    # --------------------------------------------------------------------------
+    # 2-Crear el host si no existe
     - name: "CREATE | Dar de alta host en Nagios XI"
       ansible.builtin.uri:
         url:            "{{ nagios_host }}/nagiosxi/api/v1/config/host?apikey={{ nagios_api_token }}"
@@ -72,9 +57,7 @@
         msg: "Host {{ host_name }} creado exitosamente en Nagios XI"
       when: not host_already_exists | bool
 
-    # --------------------------------------------------------------------------
-    # STEP 3: Aplicar configuracion en Nagios (reload)
-    # --------------------------------------------------------------------------
+    # 3 - Aplicar configuracion en Nagios (reload)
     - name: "APPLY | Aplicar configuracion en Nagios XI"
       ansible.builtin.uri:
         url:            "{{ nagios_host }}/nagiosxi/api/v1/system/applyconfig?apikey={{ nagios_api_token }}"
@@ -100,9 +83,7 @@
           ================================================================
       when: not host_already_exists | bool
 
-  # --------------------------------------------------------------------------
-  # RESCUE: Captura errores y levanta bandera para el reporte
-  # --------------------------------------------------------------------------
+  # Captura errores y levanta bandera para el reporte
   rescue:
     - name: "ERROR | Registrar fallo de ejecucion"
       ansible.builtin.set_fact:
@@ -114,9 +95,7 @@
       ansible.builtin.debug:
         msg: "FALLO en: {{ host_failed_task }} | Error: {{ host_error_message }}"
 
-  # --------------------------------------------------------------------------
-  # ALWAYS: Escribir reporte CSV independientemente del resultado
-  # --------------------------------------------------------------------------
+  # escribir reporte CSV independientemente del resultado
   always:
     - name: "REPORT | Escribir reporte de estado"
       ansible.builtin.copy:
