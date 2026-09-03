@@ -1,10 +1,4 @@
 ---
-# ==============================================================================
-# TASK FILE : nagios-postasks.yml
-# PROPÓSITO : Consolidar reporte CSV y limpiar archivos temporales
-#             Mismo patrón que cyberark-user-creation-postasks.yml
-# ==============================================================================
-
 - name: "POST | Crear reporte consolidado con encabezado"
   ansible.builtin.copy:
     content: "host_name,host_ip,host_alias,status,already_existed,failed_task,error_message\n"
