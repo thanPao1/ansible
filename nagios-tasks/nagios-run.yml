@@ -57,6 +57,12 @@
         msg: "Host {{ host_name }} creado exitosamente en Nagios XI"
       when: not host_already_exists | bool
 
+#debug
+    - name: "DEBUG | Mostrar respuesta completa de CREATE"
+      ansible.builtin.debug:
+        var: nagios_create_response.json
+      when: not host_already_exists | bool
+
     # 3 - Aplicar configuracion en Nagios (reload)
     - name: "APPLY | Aplicar configuracion en Nagios XI"
       ansible.builtin.uri:
@@ -68,6 +74,14 @@
       register: nagios_apply_response
       when:     not host_already_exists | bool
 
+#degug
+
+    - name: "DEBUG | Mostrar respuesta completa de APPLY"
+      ansible.builtin.debug:
+        var: nagios_apply_response.json
+      when: not host_already_exists | bool
+
+      
     - name: "APPLY | Confirmar aplicacion de configuracion"
       ansible.builtin.debug:
         msg: |
@@ -104,3 +118,5 @@
           "{{ host_name }}","{{ host_ip }}","{{ host_alias }}","{{ 'FAILED' if host_failed | default(false) else 'SUCCESS' }}","{{ host_already_exists | default(false) }}","{{ host_failed_task | default('N/A') }}","{{ host_error_message | default('') | replace('"', '""') | replace('\n', ' ') }}"
         dest:    "{{ hostvars['localhost'].local_fetch_path }}/status_report_{{ host_name }}.csv"
       changed_when: false
+
+      
