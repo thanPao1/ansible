@@ -69,11 +69,6 @@
       register: nagios_apply_response
       when:     not host_already_exists | bool
 
-    - name: "DEBUG | Mostrar respuesta completa de applyconfig"
-      ansible.builtin.debug:
-        var: nagios_apply_response.json
-      when: not host_already_exists | bool
-      
     - name: "APPLY | Esperar a que la aplicacion de configuracion termine"
       ansible.builtin.uri:
         url:            "{{ nagios_host }}/nagiosxi/api/v1/system/command/{{ nagios_apply_response.json.command_id }}?apikey={{ nagios_api_token }}"
@@ -82,7 +77,7 @@
         status_code:    [200]
         timeout:        30
       register:   nagios_apply_status
-      until:      nagios_apply_status.json.status_code | int == 2
+      until:      (nagios_apply_status.json | first).status_code | int == 2
       retries:    20
       delay:      5
       when:
@@ -93,12 +88,12 @@
       ansible.builtin.fail:
         msg: >-
           La aplicacion de configuracion en Nagios XI termino con error.
-          result_code={{ nagios_apply_status.json.result_code | default('N/A') }}
-          result={{ nagios_apply_status.json.result | default('N/A') }}
+          result_code={{ (nagios_apply_status.json | first).result_code | default('N/A') }}
+          result={{ (nagios_apply_status.json | first).result | default('N/A') }}
       when:
         - not host_already_exists | bool
         - nagios_apply_status.json is defined
-        - nagios_apply_status.json.result_code | default('1') | string != '0'
+        - (nagios_apply_status.json | first).result_code | default('1') | string != '0'
 
     - name: "APPLY | Confirmar aplicacion de configuracion"
       ansible.builtin.debug:
