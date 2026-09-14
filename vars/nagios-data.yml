@@ -1,8 +1,6 @@
 ---
 #CONEXION
 nagios_host: "https://172.16.202.219"
-
-
 nagios_host_template:          "liv-host-linux"
 nagios_hostgroup:              "linux-servers_base"
 nagios_contacts:               "nagiosadmin"
