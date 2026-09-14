@@ -57,8 +57,9 @@
         msg: "Host {{ host_name }} creado exitosamente en Nagios XI"
       when: not host_already_exists | bool
 
-    # 3 - Aplicar configuracion en Nagios (reload / reinicio del core)
-    - name: "APPLY | Aplicar configuracion en Nagios XI"
+    # 3 - Aplicar configuracion en Nagios (esto es ASINCRONO: solo confirma que se
+    #     encolo el comando, no que termino bien; por eso hay que hacer polling).
+    - name: "APPLY | Enviar comando de aplicar configuracion en Nagios XI"
       ansible.builtin.uri:
         url:            "{{ nagios_host }}/nagiosxi/api/v1/system/applyconfig?apikey={{ nagios_api_token }}"
         method:         POST
@@ -67,6 +68,32 @@
         timeout:        60
       register: nagios_apply_response
       when:     not host_already_exists | bool
+
+    - name: "APPLY | Esperar a que la aplicacion de configuracion termine"
+      ansible.builtin.uri:
+        url:            "{{ nagios_host }}/nagiosxi/api/v1/system/command/{{ nagios_apply_response.json.command_id }}?apikey={{ nagios_api_token }}"
+        method:         GET
+        validate_certs: false
+        status_code:    [200]
+        timeout:        30
+      register:   nagios_apply_status
+      until:      nagios_apply_status.json.status_code | int == 2
+      retries:    20
+      delay:      5
+      when:
+        - not host_already_exists | bool
+        - nagios_apply_response.json.command_id is defined
+
+    - name: "APPLY | Fallar si la aplicacion de configuracion no fue exitosa"
+      ansible.builtin.fail:
+        msg: >-
+          La aplicacion de configuracion en Nagios XI termino con error.
+          result_code={{ nagios_apply_status.json.result_code | default('N/A') }}
+          result={{ nagios_apply_status.json.result | default('N/A') }}
+      when:
+        - not host_already_exists | bool
+        - nagios_apply_status.json is defined
+        - nagios_apply_status.json.result_code | default('1') | string != '0'
 
     - name: "APPLY | Confirmar aplicacion de configuracion"
       ansible.builtin.debug:
