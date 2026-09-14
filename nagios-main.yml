@@ -8,7 +8,6 @@
     - vars/nagios-data.yml
     - vars/nagios-secrets.yml
   tasks:
-
     - name: "PRE | Validar variables requeridas del Survey"
       ansible.builtin.assert:
         that:
@@ -21,11 +20,9 @@
           - host_name  (ej. qroplantso8_copy_1)
           - host_alias (ej. Plantilla)
           - host_ip    (ej. 172.16.202.43)
-
     - name: "PRE | Inicializar facts globales de ejecucion"
       ansible.builtin.import_tasks:
         file: nagios-tasks/nagios-pretasks.yml
-
 
 # PLAY 2 - dar de alta el host en Nagios XI
 - name: "Nagios | Registrar Host en Nagios XI"
@@ -36,13 +33,11 @@
     - vars/nagios-data.yml
     - vars/nagios-secrets.yml
   tasks:
-
     - name: "RUN | Recuperar facts globales del Play 1"
       ansible.builtin.set_fact:
         local_fetch_path:         "{{ hostvars['localhost'].local_fetch_path }}"
         consolidated_report_name: "{{ hostvars['localhost'].consolidated_report_name }}"
         execution_epoch:          "{{ hostvars['localhost'].execution_epoch }}"
-
     - name: "RUN | Ejecutar registro de host en Nagios"
       ansible.builtin.import_tasks:
         file: nagios-tasks/nagios-run.yml
@@ -55,7 +50,6 @@
   vars_files:
     - vars/nagios-data.yml
   tasks:
-
     - name: "POST | Generar reporte consolidado y limpiar"
       ansible.builtin.import_tasks:
         file: nagios-tasks/nagios-postasks.yml
