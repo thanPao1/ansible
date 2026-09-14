@@ -69,6 +69,11 @@
       register: nagios_apply_response
       when:     not host_already_exists | bool
 
+    - name: "DEBUG | Mostrar respuesta completa de applyconfig"
+      ansible.builtin.debug:
+        var: nagios_apply_response.json
+      when: not host_already_exists | bool
+      
     - name: "APPLY | Esperar a que la aplicacion de configuracion termine"
       ansible.builtin.uri:
         url:            "{{ nagios_host }}/nagiosxi/api/v1/system/command/{{ nagios_apply_response.json.command_id }}?apikey={{ nagios_api_token }}"
