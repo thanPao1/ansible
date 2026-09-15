@@ -47,6 +47,11 @@
       register:  nagios_create_response
       when:      not host_already_exists | bool
 
+    - name: "DEBUG | Mostrar respuesta completa de CREATE"
+      ansible.builtin.debug:
+        var: nagios_create_response.json
+      when: not host_already_exists | bool
+      
     - name: "CREATE | Confirmar creacion del host"
       ansible.builtin.set_fact:
         nagios_host_created: true
