@@ -62,7 +62,7 @@
     - name: "APPLY | Enviar comando de aplicar configuracion en Nagios XI"
       ansible.builtin.uri:
         url:            "{{ nagios_host }}/nagiosxi/api/v1/system/applyconfig?apikey={{ nagios_api_token }}"
-        method:         POST
+        method:         GET
         validate_certs: false
         status_code:    [200, 201]
         timeout:        60
