@@ -25,14 +25,13 @@
       when: host_already_exists | bool
 
     # 2-Crear el host si no existe
+    # NOTA: la API de Nagios XI espera form-urlencoded, NO json.
     - name: "CREATE | Dar de alta host en Nagios XI"
       ansible.builtin.uri:
         url:            "{{ nagios_host }}/nagiosxi/api/v1/config/host?apikey={{ nagios_api_token }}"
         method:         POST
         validate_certs: false
-        headers:
-          Content-Type: "application/json"
-        body_format: json
+        body_format: form-urlencoded
         body:
           host_name:             "{{ host_name }}"
           address:               "{{ host_ip }}"
@@ -41,6 +40,10 @@
           hostgroups:            "{{ nagios_hostgroup }}"
           contacts:              "{{ nagios_contacts }}"
           notifications_enabled: "{{ nagios_notifications_enabled }}"
+          max_check_attempts:    "{{ nagios_max_check_attempts }}"
+          check_period:          "{{ nagios_check_period }}"
+          notification_interval: "{{ nagios_notification_interval }}"
+          notification_period:   "{{ nagios_notification_period }}"
           register:              "1"
         status_code: [200, 201]
         timeout:     30
@@ -51,7 +54,7 @@
       ansible.builtin.debug:
         var: nagios_create_response.json
       when: not host_already_exists | bool
-      
+
     - name: "CREATE | Confirmar creacion del host"
       ansible.builtin.set_fact:
         nagios_host_created: true
