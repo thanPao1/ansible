@@ -6,6 +6,12 @@ nagios_hostgroup:              "linux-servers_base"
 nagios_contacts:               "nagiosadmin"
 nagios_notifications_enabled:  "0"
 
+#Campos requeridos por la API de Nagios XI al crear el host
+nagios_max_check_attempts:    "5"
+nagios_check_period:          "xi_timeperiod_24x7"
+nagios_notification_interval: "60"
+nagios_notification_period:   "xi_timeperiod_24x7"
+
 #Rutas para reporte
 local_fetch_path:         "/tmp/ansible_nagios_reports_{{ now(utc=True, fmt='%Y%m%d%H%M%S') }}"
 consolidated_report_name: "report-Nagios-{{ now(utc=True, fmt='%Y-%m-%dT%H%M%SZ') }}.csv"
