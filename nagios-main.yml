@@ -42,14 +42,24 @@
       ansible.builtin.import_tasks:
         file: nagios-tasks/nagios-run.yml
 
-# PLAY 3- Post-tasks: reporte y limpieza
+# PLAY 3- Post-tasks: reporte, notificacion a Google Chat y limpieza
 - name: "Nagios | Reporte y limpieza"
   hosts: localhost
   connection: local
   gather_facts: false
   vars_files:
     - vars/nagios-data.yml
+    - vars/nagios-secrets.yml
   tasks:
-    - name: "POST | Generar reporte consolidado y limpiar"
+    - name: "RUN | Recuperar facts de host del Play 2"
+      ansible.builtin.set_fact:
+        host_name:           "{{ hostvars['localhost'].host_name }}"
+        host_alias:          "{{ hostvars['localhost'].host_alias }}"
+        host_ip:             "{{ hostvars['localhost'].host_ip }}"
+        host_already_exists: "{{ hostvars['localhost'].host_already_exists | default(false) }}"
+        host_failed:         "{{ hostvars['localhost'].host_failed | default(false) }}"
+        host_failed_task:    "{{ hostvars['localhost'].host_failed_task | default('N/A') }}"
+        host_error_message:  "{{ hostvars['localhost'].host_error_message | default('') }}"
+    - name: "POST | Generar reporte consolidado, notificar y limpiar"
       ansible.builtin.import_tasks:
         file: nagios-tasks/nagios-postasks.yml
