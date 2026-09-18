@@ -11,6 +11,48 @@
       {{ hostvars['localhost'].local_fetch_path }}/{{ hostvars['localhost'].consolidated_report_name }} || true
   changed_when: false
 
+- name: "POST | Subir reporte consolidado a Google Cloud Storage"
+  google.cloud.gcp_storage_object:
+    bucket:  "sit-devops-repository-bkt02"
+    src:     "{{ hostvars['localhost'].local_fetch_path }}/{{ hostvars['localhost'].consolidated_report_name }}"
+    dest:    "reporte-nagios/{{ hostvars['localhost'].execution_epoch }}-nagios-report.csv"
+    project: "sit-devops-repository"
+    action:  upload
+  when: false   # Deshabilitado hasta instalar la coleccion google.cloud en el EE
+
+- name: "POST | Armar mensaje de resumen para Google Chat"
+  ansible.builtin.set_fact:
+    chat_status_emoji: "{{ '⚠️' if host_already_exists | bool else ('✅' if not (host_failed | default(false) | bool) else '❌') }}"
+    chat_status_texto: "{{ 'YA EXISTIA (sin cambios)' if host_already_exists | bool else ('EXITOSO' if not (host_failed | default(false) | bool) else 'FALLIDO') }}"
+
+- name: "POST | Notificar resumen en Google Chat"
+  ansible.builtin.uri:
+    url:            "{{ google_chat_webhook_url }}"
+    method:         POST
+    validate_certs: false
+    headers:
+      Content-Type: "application/json; charset=UTF-8"
+    body_format: json
+    body:
+      text: |
+        {{ chat_status_emoji }} *Nagios XI | Alta de Host*
+        Host: `{{ host_name }}`
+        Alias: `{{ host_alias }}`
+        IP: `{{ host_ip }}`
+        Hostgroup: `{{ nagios_hostgroup }}`
+        Ya existia: {{ host_already_exists | default(false) }}
+        Estado: *{{ chat_status_texto }}*
+        {{ ('Fallo en: ' + (host_failed_task | default('N/A')) + ' | Error: ' + (host_error_message | default(''))) if (host_failed | default(false) | bool) else '' }}
+    status_code: [200, 201]
+    timeout:     15
+  register: chat_notify_response
+  ignore_errors: true   # Que un fallo al notificar nunca tumbe el playbook
+
+- name: "POST | Avisar si la notificacion a Google Chat fallo"
+  ansible.builtin.debug:
+    msg: "AVISO: No se pudo notificar a Google Chat. Detalle: {{ chat_notify_response.msg | default('desconocido') }}"
+  when: chat_notify_response is failed
+
 - name: "POST | Limpiar directorio temporal del controller"
   ansible.builtin.file:
     path:  "{{ hostvars['localhost'].local_fetch_path }}"
