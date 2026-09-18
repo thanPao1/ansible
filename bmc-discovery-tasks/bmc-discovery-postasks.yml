@@ -11,14 +11,6 @@
       {{ hostvars['localhost'].local_fetch_path }}/{{ hostvars['localhost'].consolidated_report_name }} || true
   changed_when: false
 
-- name: "POST | Upload consolidated report to Google Cloud Storage"
-  google.cloud.gcp_storage_object:
-    bucket: "sit-devops-repository-bkt02"
-    src:    "{{ hostvars['localhost'].local_fetch_path }}/{{ hostvars['localhost'].consolidated_report_name }}"
-    dest:   "reporte-bmc-discovery/{{ hostvars['localhost'].execution_epoch }}-discovery-report.csv"
-    project: "sit-devops-repository"
-    action: upload
-
 - name: "POST | Clean up local temporary files"
   ansible.builtin.file:
     path:  "{{ hostvars['localhost'].local_fetch_path }}"
