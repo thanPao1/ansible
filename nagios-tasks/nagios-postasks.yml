@@ -11,15 +11,6 @@
       {{ hostvars['localhost'].local_fetch_path }}/{{ hostvars['localhost'].consolidated_report_name }} || true
   changed_when: false
 
-- name: "POST | Subir reporte consolidado a Google Cloud Storage"
-  google.cloud.gcp_storage_object:
-    bucket:  "sit-devops-repository-bkt02"
-    src:     "{{ hostvars['localhost'].local_fetch_path }}/{{ hostvars['localhost'].consolidated_report_name }}"
-    dest:    "reporte-nagios/{{ hostvars['localhost'].execution_epoch }}-nagios-report.csv"
-    project: "sit-devops-repository"
-    action:  upload
-  when: false   # Deshabilitado hasta instalar la coleccion google.cloud en el EE
-
 - name: "POST | Armar mensaje de resumen para Google Chat"
   ansible.builtin.set_fact:
     chat_status_emoji: "{{ '⚠️' if host_already_exists | bool else ('✅' if not (host_failed | default(false) | bool) else '❌') }}"
