@@ -1,4 +1,21 @@
 # Playbooks
+# Ejecución
+## Playbook 1 
+Entorno de ejecución - MV gcpagtama00 
+
+Se requiere IP a descubrir
+`ansible-playbook bmc-discovery-main.yml -e "target_ip=0.0.0.0"`
+
+## Playbook 2
+Entorno de ejecución - AAP
+
+Se requiere:
+* Host name
+* Alias del host
+* IP 
+
+Job que se ejecuta `Nagios | Alta de Host`
+
 ## Ansible
 Objetivo:
 Que Ansible ejecute un job/playbook que invoque a BMC Discovery para realizar un discovery inmediato sobre una IP.
