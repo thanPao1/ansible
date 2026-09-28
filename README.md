@@ -1,5 +1,5 @@
-# Playbooks
-## Ansible
+# Playbooks (3)
+# 1 - Ansible
 ### Objetivo:
 Que Ansible ejecute un job/playbook que invoque a BMC Discovery para realizar un discovery inmediato sobre una IP.
 
@@ -50,7 +50,7 @@ El cual los roles serian:
 ### SHELL:
  No lo necesitas porque solo se usara API ya que no requieren login a linux
 
-## Nagios
+# 2 - Nagios
 Estructura de playbook y recursos necesarios
 
 ### IP: 
@@ -74,3 +74,24 @@ define host {
 ```
 
 Es importante mencionar que la playbook no debe de crear los servicios de monitoreo, únicamente dar de alta el Host en el hostgroup antes mencionado.
+
+# 3 - EDR
+### Acceso Controlado
+Se otorgará acceso mediante un API Client con el principio de mínimo privilegio (Read-Only).
+
+### Fase de Pruebas: 
+Se iniciará con una etapa de pruebas iniciales para que el equipo de seguridad valide el comportamiento y las peticiones desde ansible.
+
+### Alcance de Permisos:
+Permisos requeridos: Hosts: Read (Lectura de inventario/estado).
+
+Sin permisos críticos: Se confirma que NO se requieren permisos de modificación (Write), eliminación (Delete), ni respuesta remota (Real Time Response).
+
+(Pendiente: Validar/reconfirmar este alcance).
+
+### Flujo Técnico de Validación:
+Una vez desplegada la VM e instalado el sensor de CrowdStrike, el playbook ejecutará una petición GET autenticada vía Token contra la REST API de CrowdStrike, utilizando como filtro el hostname o la local_ip.
+
+La API retornará el identificador único del agente (Agent ID / AID).
+
+Si la respuesta arroja un AID válido y en estado activo, el orquestador validará el gate de seguridad como exitoso y continuará con el flujo definido
