@@ -78,6 +78,7 @@ Es importante mencionar que la playbook no debe de crear los servicios de monito
 # 3 - EDR
 ### Acceso Controlado
 Se otorgará acceso mediante un API Client con el principio de mínimo privilegio (Read-Only).
+* Token usuario: https://api.us-2.crowdstrike.com
 
 ### Fase de Pruebas: 
 Se iniciará con una etapa de pruebas iniciales para que el equipo de seguridad valide el comportamiento y las peticiones desde ansible.
