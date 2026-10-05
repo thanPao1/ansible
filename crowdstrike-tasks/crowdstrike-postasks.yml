@@ -1,0 +1,15 @@
+---
+# Resultado final del gate: falla si el host no está activo, o reporta éxito.
+
+- name: Fallar el gate si el dispositivo no está en estado activo
+  ansible.builtin.fail:
+    msg: >
+      Gate de seguridad FALLIDO: AID '{{ cs_aid }}' encontrado,
+      pero el host no está en estado activo (status actual: '{{ cs_device_status }}').
+  when: cs_device_status != crowdstrike_active_status_value
+
+- name: Gate de seguridad exitoso
+  ansible.builtin.debug:
+    msg: >
+      Gate de seguridad EXITOSO. Host '{{ target_hostname }}' validado
+      con AID '{{ cs_aid }}' en estado '{{ cs_device_status }}'.
