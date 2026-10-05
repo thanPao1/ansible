@@ -1,17 +1,21 @@
----
-#CONEXION
-nagios_host: "https://172.16.202.219"
-nagios_host_template:          "liv-host-linux"
-nagios_hostgroup:              "linux-servers_base"
-nagios_contacts:               "nagiosadmin"
-nagios_notifications_enabled:  "0"
+--- #main
+# Base URL de la API (TODO: confirmar región real con EDR)
+crowdstrike_base_url: "https://api.us-2.crowdstrike.com"
 
-#Campos requeridos por la API de Nagios XI al crear el host
-nagios_max_check_attempts:    "5"
-nagios_check_period:          "xi_timeperiod_24x7"
-nagios_notification_interval: "60"
-nagios_notification_period:   "xi_timeperiod_24x7"
+# Endpoints usados
+crowdstrike_oauth_endpoint: "{{ crowdstrike_base_url }}/oauth2/token"
+crowdstrike_query_devices_endpoint: "{{ crowdstrike_base_url }}/devices/queries/devices/v1"
+crowdstrike_device_detail_endpoint: "{{ crowdstrike_base_url }}/devices/entities/devices/v1"
 
-#Rutas para reporte
-local_fetch_path:         "/tmp/ansible_nagios_reports_{{ now(utc=True, fmt='%Y%m%d%H%M%S') }}"
-consolidated_report_name: "report-Nagios-{{ now(utc=True, fmt='%Y-%m-%dT%H%M%SZ') }}.csv"
+# Campo usado como filtro en la consulta: "hostname" o "local_ip"
+# TODO: confirmar con EDR cuál usar como filtro primario
+crowdstrike_filter_field: "hostname"
+
+# Valor de "status" que la API considera como host activo
+# TODO: confirmar con EDR el valor exacto
+crowdstrike_active_status_value: "normal"
+
+# Reintentos mientras el sensor se registra en CrowdStrike
+# TODO: ajustar según tiempo real de propagación que confirme EDR
+crowdstrike_gate_retries: 10
+crowdstrike_gate_delay_seconds: 30
