@@ -1,0 +1,39 @@
+---
+# Validaciones previas + autenticación OAuth2 contra CrowdStrike.
+
+- name: Validar que las credenciales de CrowdStrike estén definidas
+  ansible.builtin.assert:
+    that:
+      - cs_client_id is defined
+      - cs_client_secret is defined
+    fail_msg: >
+      Faltan cs_client_id / cs_client_secret. Deben inyectarse desde el
+      Credential de AAP asociado a este Job Template.
+    quiet: true
+
+- name: Validar que el hostname/local_ip objetivo esté definido
+  ansible.builtin.assert:
+    that:
+      - target_hostname is defined
+      - target_hostname | length > 0
+    fail_msg: "Falta target_hostname (dato del host a validar en CrowdStrike)."
+    quiet: true
+
+- name: Solicitar token OAuth2 a CrowdStrike
+  ansible.builtin.uri:
+    url: "{{ crowdstrike_oauth_endpoint }}"
+    method: POST
+    body_format: form-urlencoded
+    body:
+      client_id: "{{ cs_client_id }}"
+      client_secret: "{{ cs_client_secret }}"
+    headers:
+      Accept: "application/json"
+    status_code: 201
+  register: cs_auth
+  no_log: true
+
+- name: Fijar variable con el access_token
+  ansible.builtin.set_fact:
+    cs_token: "{{ cs_auth.json.access_token }}"
+  no_log: true
