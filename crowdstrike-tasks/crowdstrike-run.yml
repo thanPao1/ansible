@@ -1,0 +1,40 @@
+---
+# Lógica principal del gate: consulta el AID del host (con reintentos) y valida su estado en CrowdStrike.
+- name: Consultar AID del host en CrowdStrike (con reintentos)
+  ansible.builtin.uri:
+    url: "{{ crowdstrike_query_devices_endpoint }}?filter={{ crowdstrike_filter_field }}:'{{ target_hostname }}'"
+    method: GET
+    headers:
+      Authorization: "Bearer {{ cs_token }}"
+      Accept: "application/json"
+    status_code: 200
+  register: cs_query
+  until: cs_query.json.resources | default([]) | length > 0
+  retries: "{{ crowdstrike_gate_retries }}"
+  delay: "{{ crowdstrike_gate_delay_seconds }}"
+
+- name: Fallar si no se encontró ningún AID tras los reintentos
+  ansible.builtin.fail:
+    msg: >
+      Gate de seguridad FALLIDO: no se encontró AID para el host
+      '{{ target_hostname }}' tras {{ crowdstrike_gate_retries }} intentos.
+  when: cs_query.json.resources | default([]) | length == 0
+
+- name: Fijar el AID encontrado
+  ansible.builtin.set_fact:
+    cs_aid: "{{ cs_query.json.resources[0] }}"
+
+- name: Consultar detalle del dispositivo por AID
+  ansible.builtin.uri:
+    url: "{{ crowdstrike_device_detail_endpoint }}?ids={{ cs_aid }}"
+    method: GET
+    headers:
+      Authorization: "Bearer {{ cs_token }}"
+      Accept: "application/json"
+    status_code: 200
+  register: cs_device_detail
+
+- name: Fijar status del dispositivo
+  ansible.builtin.set_fact:
+    cs_device_status: "{{ cs_device_detail.json.resources[0].status | default('unknown') }}"
+    # TODO: validar también reduced_functionality_mode (RFM) si EDR lo confirma
