@@ -1,0 +1,21 @@
+---
+
+- name: Gate de validación CrowdStrike - host activo con AID
+  hosts: "{{ target_hosts | default('localhost') }}"
+  gather_facts: false
+
+  vars_files:
+    - vars/main.yml
+
+  vars:
+    target_hostname: "{{ target_hostname | default(inventory_hostname) }}"
+
+  tasks:
+    - name: Pretasks - validaciones y autenticación
+      ansible.builtin.import_tasks: crowdstrike-tasks/crowdstrike-pretasks.yml
+
+    - name: Run - consulta y validación del AID
+      ansible.builtin.import_tasks: crowdstrike-tasks/crowdstrike-run.yml
+
+    - name: Postasks - resultado del gate
+      ansible.builtin.import_tasks: crowdstrike-tasks/crowdstrike-postasks.yml
