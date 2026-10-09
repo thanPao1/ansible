@@ -9,7 +9,7 @@
     - vars/crowdstrike-secrets.yml
 
   vars:
-    target_hostname: "{{ target_hostname | default(inventory_hostname) }}"
+    cs_target_hostname: "{{ target_hostname | default(inventory_hostname) }}"
 
   tasks:
     - name: Pretasks - validaciones y autenticación
