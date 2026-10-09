@@ -17,3 +17,8 @@ crowdstrike_fail_on_rfm: true
 # Reintentos mientras el sensor se registra en CrowdStrike
 crowdstrike_gate_retries: 10
 crowdstrike_gate_delay_seconds: 30
+
+# CLiente (Vault)
+---
+cs_client_id: "{{ vault_cs_client_id }}"
+cs_client_secret: "{{ vault_cs_client_secret }}"
