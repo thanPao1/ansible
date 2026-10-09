@@ -1,5 +1,5 @@
 --- #main
-# Base URL de la API (TODO: confirmar región real con EDR)
+# Base URL de la API (confirmada: el endpoint OAuth2 responde en us-2)
 crowdstrike_base_url: "https://api.us-2.crowdstrike.com"
 
 # Endpoints usados
@@ -8,14 +8,12 @@ crowdstrike_query_devices_endpoint: "{{ crowdstrike_base_url }}/devices/queries/
 crowdstrike_device_detail_endpoint: "{{ crowdstrike_base_url }}/devices/entities/devices/v1"
 
 # Campo usado como filtro en la consulta: "hostname" o "local_ip"
-# TODO: confirmar con EDR cuál usar como filtro primario
 crowdstrike_filter_field: "hostname"
 
-# Valor de "status" que la API considera como host activo
-# TODO: confirmar con EDR el valor exacto
-crowdstrike_active_status_value: "normal"
+# Criterios para considerar el host "activo".
+crowdstrike_max_last_seen_seconds: 900   # 15 min
+crowdstrike_fail_on_rfm: true
 
 # Reintentos mientras el sensor se registra en CrowdStrike
-# TODO: ajustar según tiempo real de propagación que confirme EDR
 crowdstrike_gate_retries: 10
 crowdstrike_gate_delay_seconds: 30
