@@ -1,15 +1,23 @@
----
-# Resultado final del gate: falla si el host no está activo, o reporta éxito.
-
-- name: Fallar el gate si el dispositivo no está en estado activo
+- name: Fallar el gate si el sensor no ha reportado recientemente
   ansible.builtin.fail:
     msg: >
-      Gate de seguridad FALLIDO: AID '{{ cs_aid }}' encontrado,
-      pero el host no está en estado activo (status actual: '{{ cs_device_status }}').
-  when: cs_device_status != crowdstrike_active_status_value
+      Gate de seguridad FALLIDO: AID '{{ cs_aid }}' encontrado, pero su último
+      contacto (last_seen: '{{ cs_last_seen | default('desconocido') }}') supera
+      el umbral de {{ crowdstrike_max_last_seen_seconds }} segundos.
+  when: cs_last_seen_age_seconds | int > crowdstrike_max_last_seen_seconds | int
+
+- name: Fallar el gate si el sensor está en modo de funcionalidad reducida
+  ansible.builtin.fail:
+    msg: >
+      Gate de seguridad FALLIDO: AID '{{ cs_aid }}' está en modo de
+      funcionalidad reducida (RFM = '{{ cs_rfm }}').
+  when:
+    - crowdstrike_fail_on_rfm | bool
+    - cs_rfm == 'yes'
 
 - name: Gate de seguridad exitoso
   ansible.builtin.debug:
     msg: >
-      Gate de seguridad EXITOSO. Host '{{ target_hostname }}' validado
-      con AID '{{ cs_aid }}' en estado '{{ cs_device_status }}'.
+      Gate de seguridad EXITOSO. Host '{{ target_hostname }}' validado con
+      AID '{{ cs_aid }}' (last_seen hace {{ cs_last_seen_age_seconds }}s,
+      RFM = '{{ cs_rfm }}', status = '{{ cs_device_status }}').
