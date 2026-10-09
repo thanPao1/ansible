@@ -1,15 +1,12 @@
 ---
-
 - name: Gate de validación CrowdStrike - host activo con AID
-  hosts: "{{ target_hosts | default('localhost') }}"
+  hosts: localhost
+  connection: local
   gather_facts: false
 
   vars_files:
     - vars/main.yml
     - vars/crowdstrike-secrets.yml
-
-  vars:
-    cs_target_hostname: "{{ target_hostname | default(inventory_hostname) }}"
 
   tasks:
     - name: Pretasks - validaciones y autenticación
