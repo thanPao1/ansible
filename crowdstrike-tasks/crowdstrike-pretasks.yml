@@ -3,9 +3,11 @@
     that:
       - cs_client_id is defined
       - cs_client_secret is defined
+      - cs_client_id | length > 0
+      - cs_client_secret | length > 0
     fail_msg: >
-      Faltan cs_client_id / cs_client_secret. Deben inyectarse desde el
-      Credential de AAP asociado a este Job Template.
+      Faltan las credenciales de CrowdStrike.
+      Verifica vars/main.yml y vars/crowdstrike-secrets.yml.
     quiet: true
 
 - name: Validar que el host objetivo esté definido
