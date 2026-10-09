@@ -1,5 +1,7 @@
 ---
-# Lógica principal del gate: consulta el AID del host (con reintentos) y valida su estado en CrowdStrike.
+# Lógica principal del gate: consulta el AID del host (con reintentos) y
+# obtiene los datos de actividad del sensor.
+
 - name: Consultar AID del host en CrowdStrike (con reintentos)
   ansible.builtin.uri:
     url: "{{ crowdstrike_query_devices_endpoint }}?filter={{ crowdstrike_filter_field }}:'{{ target_hostname }}'"
@@ -12,6 +14,7 @@
   until: cs_query.json.resources | default([]) | length > 0
   retries: "{{ crowdstrike_gate_retries }}"
   delay: "{{ crowdstrike_gate_delay_seconds }}"
+  no_log: true
 
 - name: Fallar si no se encontró ningún AID tras los reintentos
   ansible.builtin.fail:
@@ -33,8 +36,16 @@
       Accept: "application/json"
     status_code: 200
   register: cs_device_detail
+  no_log: true
 
-- name: Fijar status del dispositivo
+- name: Fijar datos de actividad del sensor
   ansible.builtin.set_fact:
     cs_device_status: "{{ cs_device_detail.json.resources[0].status | default('unknown') }}"
-    # TODO: validar también reduced_functionality_mode (RFM) si EDR lo confirma
+    cs_last_seen: "{{ cs_device_detail.json.resources[0].last_seen | default('') }}"
+    cs_rfm: "{{ cs_device_detail.json.resources[0].reduced_functionality_mode | default('unknown') }}"
+
+- name: Calcular antigüedad del último contacto (last_seen)
+  ansible.builtin.set_fact:
+    cs_last_seen_age_seconds: >-
+      {{ ((now(utc=true) - (cs_last_seen | to_datetime('%Y-%m-%dT%H:%M:%SZ'))).total_seconds() | int)
+         if (cs_last_seen | length > 0) else 999999999 }}
