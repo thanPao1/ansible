@@ -1,6 +1,3 @@
----
-# Validaciones previas + autenticación OAuth2 contra CrowdStrike.
-
 - name: Validar que las credenciales de CrowdStrike estén definidas
   ansible.builtin.assert:
     that:
@@ -11,12 +8,14 @@
       Credential de AAP asociado a este Job Template.
     quiet: true
 
-- name: Validar que el hostname/local_ip objetivo esté definido
+- name: Validar que el host objetivo esté definido
   ansible.builtin.assert:
     that:
       - target_hostname is defined
       - target_hostname | length > 0
-    fail_msg: "Falta target_hostname (dato del host a validar en CrowdStrike)."
+    fail_msg: >
+      Falta target_hostname (nombre del host a validar en CrowdStrike).
+      Debe llegar como extra_var, Survey o desde el paso anterior del Workflow.
     quiet: true
 
 - name: Solicitar token OAuth2 a CrowdStrike
