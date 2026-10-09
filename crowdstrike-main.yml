@@ -6,6 +6,7 @@
 
   vars_files:
     - vars/main.yml
+    - vars/crowdstrike-secrets.yml
 
   vars:
     target_hostname: "{{ target_hostname | default(inventory_hostname) }}"
