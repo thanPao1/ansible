@@ -14,14 +14,55 @@
   until: cs_query.json.resources | default([]) | length > 0
   retries: "{{ crowdstrike_gate_retries }}"
   delay: "{{ crowdstrike_gate_delay_seconds }}"
+  ignore_errors: true   # el resultado se evalúa en la tarea siguiente con un mensaje claro
   no_log: true
 
-- name: Fallar si no se encontró ningún AID tras los reintentos
+- name: Evaluar resultado de la búsqueda del AID
+  ansible.builtin.set_fact:
+    cs_aid_found: "{{ cs_query.json.resources | default([]) | length > 0 }}"
+    cs_query_http: "{{ cs_query.status | default(0) | int }}"
+
+# --- Caso: la API respondió (HTTP 200) pero no existe ningún AID para ese host
+- name: Registrar resultado - sensor no instalado
+  ansible.builtin.set_stats:
+    data:
+      crowdstrike_gate_result: sensor_no_instalado
+      crowdstrike_gate_host: "{{ target_hostname }}"
+  when:
+    - not cs_aid_found | bool
+    - cs_query_http == 200
+
+- name: Fallar - sensor no instalado
   ansible.builtin.fail:
-    msg: >
-      Gate de seguridad FALLIDO: no se encontró AID para el host
-      '{{ target_hostname }}' tras {{ crowdstrike_gate_retries }} intentos.
-  when: cs_query.json.resources | default([]) | length == 0
+    msg: >-
+      Gate de seguridad FALLIDO [SENSOR NO INSTALADO]: no existe ningún AID en
+      CrowdStrike para el host '{{ target_hostname }}' (filtro: {{ crowdstrike_filter_field }}).
+      El sensor no está instalado o aún no se ha registrado
+      (se reintentó {{ crowdstrike_gate_retries }} veces cada {{ crowdstrike_gate_delay_seconds }}s).
+      Si el sensor sí está instalado, verificar que el nombre coincida con el que reporta el sensor.
+  when:
+    - not cs_aid_found | bool
+    - cs_query_http == 200
+
+# --- Caso: la API no respondió bien (credenciales, permisos, límite o red)
+- name: Registrar resultado - error de API
+  ansible.builtin.set_stats:
+    data:
+      crowdstrike_gate_result: error_api
+      crowdstrike_gate_host: "{{ target_hostname }}"
+  when:
+    - not cs_aid_found | bool
+    - cs_query_http != 200
+
+- name: Fallar - error de API
+  ansible.builtin.fail:
+    msg: >-
+      Gate de seguridad FALLIDO [ERROR DE API]: no se pudo consultar CrowdStrike
+      para el host '{{ target_hostname }}'. HTTP: {{ cs_query_http if cs_query_http != 0 else 'sin respuesta' }}
+      (401 = credenciales, 403 = permisos, 429 = límite de peticiones, 5xx = API, sin respuesta = red/FW).
+  when:
+    - not cs_aid_found | bool
+    - cs_query_http != 200
 
 - name: Fijar el AID encontrado
   ansible.builtin.set_fact:
