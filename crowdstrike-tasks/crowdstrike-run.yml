@@ -44,8 +44,25 @@
     cs_last_seen: "{{ cs_device_detail.json.resources[0].last_seen | default('') }}"
     cs_rfm: "{{ cs_device_detail.json.resources[0].reduced_functionality_mode | default('unknown') }}"
 
-- name: Calcular antigüedad del último contacto (last_seen)
+- name: Consultar estado en línea del sensor (con reintentos)
+  ansible.builtin.uri:
+    url: "{{ crowdstrike_online_state_endpoint }}?ids={{ cs_aid }}"
+    method: GET
+    headers:
+      Authorization: "Bearer {{ cs_token }}"
+      Accept: "application/json"
+    status_code: 200
+  register: cs_online
+  until:
+    - cs_online.json.resources | default([]) | length > 0
+    - (cs_online.json.resources[0].state | default('unknown')) == crowdstrike_required_online_state
+  retries: "{{ crowdstrike_gate_retries }}"
+  delay: "{{ crowdstrike_gate_delay_seconds }}"
+  ignore_errors: true   # el resultado se evalúa en postasks con un mensaje claro
+  no_log: true
+
+- name: Fijar estado en línea del sensor
   ansible.builtin.set_fact:
-    cs_last_seen_age_seconds: >-
-      {{ ((now(utc=true) - (cs_last_seen | to_datetime('%Y-%m-%dT%H:%M:%SZ'))).total_seconds() | int)
-         if (cs_last_seen | length > 0) else 999999999 }}
+    cs_online_state: >-
+      {{ cs_online.json.resources[0].state | default('unknown')
+         if (cs_online.json.resources | default([]) | length > 0) else 'unknown' }}
