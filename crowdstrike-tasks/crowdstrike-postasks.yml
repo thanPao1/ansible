@@ -23,7 +23,7 @@
       crowdstrike_gate_aid: "{{ cs_aid }}"
   when:
     - crowdstrike_fail_on_rfm | bool
-    - cs_rfm == 'yes'
+    - cs_rfm | string | lower in ['yes', 'true']
 
 - name: Fallar el gate si el sensor está en modo de funcionalidad reducida
   ansible.builtin.fail:
@@ -32,7 +32,7 @@
       funcionalidad reducida (RFM = '{{ cs_rfm }}').
   when:
     - crowdstrike_fail_on_rfm | bool
-    - cs_rfm == 'yes'
+    - cs_rfm | string | lower in ['yes', 'true']
 
 - name: Registrar resultado - gate exitoso
   ansible.builtin.set_stats:
@@ -40,6 +40,9 @@
       crowdstrike_gate_result: ok
       crowdstrike_gate_host: "{{ target_hostname }}"
       crowdstrike_gate_aid: "{{ cs_aid }}"
+      crowdstrike_gate_serial_number: "{{ cs_serial }}"
+      crowdstrike_gate_vm_uuid: "{{ cs_vm_uuid_vcenter }}"
+      crowdstrike_gate_local_ip: "{{ cs_local_ip }}"
 
 - name: Gate de seguridad exitoso
   ansible.builtin.debug:
@@ -47,3 +50,8 @@
       Gate de seguridad EXITOSO. Host '{{ target_hostname }}' validado con
       AID '{{ cs_aid }}' (estado = '{{ cs_online_state }}', last_seen = '{{ cs_last_seen }}',
       RFM = '{{ cs_rfm }}', status = '{{ cs_device_status }}').
+      Datos reportados por CrowdStrike: hostname = '{{ cs_hostname_reported }}',
+      local_ip = '{{ cs_local_ip }}', mac = '{{ cs_mac }}',
+      serial_number = '{{ cs_serial }}', modelo = '{{ cs_system_product }}'.
+      UUID de la VM (formato vCenter) = '{{ cs_vm_uuid_vcenter }}',
+      UUID de la VM (formato SMBIOS/dmidecode) = '{{ cs_vm_uuid_smbios }}'.
