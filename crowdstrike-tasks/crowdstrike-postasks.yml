@@ -1,10 +1,11 @@
-- name: Fallar el gate si el sensor no ha reportado recientemente
+- name: Fallar el gate si el sensor no está en línea
   ansible.builtin.fail:
     msg: >
-      Gate de seguridad FALLIDO: AID '{{ cs_aid }}' encontrado, pero su último
-      contacto (last_seen: '{{ cs_last_seen | default('desconocido') }}') supera
-      el umbral de {{ crowdstrike_max_last_seen_seconds }} segundos.
-  when: cs_last_seen_age_seconds | int > crowdstrike_max_last_seen_seconds | int
+      Gate de seguridad FALLIDO: AID '{{ cs_aid }}' encontrado, pero el sensor
+      no está en línea (estado: '{{ cs_online_state }}',
+      last_seen: '{{ cs_last_seen | default('desconocido') }}',
+      HTTP online-state: '{{ cs_online.status | default('sin respuesta') }}').
+  when: cs_online_state != crowdstrike_required_online_state
 
 - name: Fallar el gate si el sensor está en modo de funcionalidad reducida
   ansible.builtin.fail:
@@ -19,5 +20,5 @@
   ansible.builtin.debug:
     msg: >
       Gate de seguridad EXITOSO. Host '{{ target_hostname }}' validado con
-      AID '{{ cs_aid }}' (last_seen hace {{ cs_last_seen_age_seconds }}s,
+      AID '{{ cs_aid }}' (estado = '{{ cs_online_state }}', last_seen = '{{ cs_last_seen }}',
       RFM = '{{ cs_rfm }}', status = '{{ cs_device_status }}').
