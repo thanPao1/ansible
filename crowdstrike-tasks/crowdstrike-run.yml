@@ -30,7 +30,7 @@
       crowdstrike_gate_host: "{{ target_hostname }}"
   when:
     - not cs_aid_found | bool
-    - cs_query_http == 200
+    - cs_query_http | int == 200
 
 - name: Fallar - sensor no instalado
   ansible.builtin.fail:
@@ -42,7 +42,7 @@
       Si el sensor sí está instalado, verificar que el nombre coincida con el que reporta el sensor.
   when:
     - not cs_aid_found | bool
-    - cs_query_http == 200
+    - cs_query_http | int == 200
 
 # --- Caso: la API no respondió bien (credenciales, permisos, límite o red)
 - name: Registrar resultado - error de API
@@ -52,17 +52,17 @@
       crowdstrike_gate_host: "{{ target_hostname }}"
   when:
     - not cs_aid_found | bool
-    - cs_query_http != 200
+    - cs_query_http | int != 200
 
 - name: Fallar - error de API
   ansible.builtin.fail:
     msg: >-
       Gate de seguridad FALLIDO [ERROR DE API]: no se pudo consultar CrowdStrike
-      para el host '{{ target_hostname }}'. HTTP: {{ cs_query_http if cs_query_http != 0 else 'sin respuesta' }}
+      para el host '{{ target_hostname }}'. HTTP: {{ (cs_query_http | int) if (cs_query_http | int) != 0 else 'sin respuesta' }}
       (401 = credenciales, 403 = permisos, 429 = límite de peticiones, 5xx = API, sin respuesta = red/FW).
   when:
     - not cs_aid_found | bool
-    - cs_query_http != 200
+    - cs_query_http | int != 200
 
 - name: Fijar el AID encontrado
   ansible.builtin.set_fact:
@@ -84,6 +84,24 @@
     cs_device_status: "{{ cs_device_detail.json.resources[0].status | default('unknown') }}"
     cs_last_seen: "{{ cs_device_detail.json.resources[0].last_seen | default('') }}"
     cs_rfm: "{{ cs_device_detail.json.resources[0].reduced_functionality_mode | default('unknown') }}"
+    cs_hostname_reported: "{{ cs_device_detail.json.resources[0].hostname | default('n/d') }}"
+    cs_local_ip: "{{ cs_device_detail.json.resources[0].local_ip | default('n/d') }}"
+    cs_mac: "{{ cs_device_detail.json.resources[0].mac_address | default('n/d') }}"
+    cs_serial: "{{ cs_device_detail.json.resources[0].serial_number | default('n/d') }}"
+    cs_system_product: "{{ cs_device_detail.json.resources[0].system_product_name | default('n/d') }}"
+
+# El serial_number de una VM VMware ("VMware-42 38 d4 b6 ...") contiene el BIOS UUID de la VM.
+#  - formato vCenter/VMX (uuid.bios): orden de bytes tal cual
+#  - formato SMBIOS/dmidecode (>= 2.6): los 3 primeros grupos con bytes invertidos
+# Solo aplica a VMs VMware; en otro caso queda 'n/d'.
+- name: Derivar UUID de la VM a partir del serial_number (solo VMware)
+  ansible.builtin.set_fact:
+    cs_vm_uuid_vcenter: >-
+      {% set h = (cs_serial | regex_replace('^VMware-', '') | regex_replace('[ -]', '') | lower) if (cs_serial is match('^VMware-')) else '' -%}
+      {{ (h[0:8] ~ '-' ~ h[8:12] ~ '-' ~ h[12:16] ~ '-' ~ h[16:20] ~ '-' ~ h[20:32]) if (h | length == 32) else 'n/d' }}
+    cs_vm_uuid_smbios: >-
+      {% set h = (cs_serial | regex_replace('^VMware-', '') | regex_replace('[ -]', '') | lower) if (cs_serial is match('^VMware-')) else '' -%}
+      {{ (h[6:8] ~ h[4:6] ~ h[2:4] ~ h[0:2] ~ '-' ~ h[10:12] ~ h[8:10] ~ '-' ~ h[14:16] ~ h[12:14] ~ '-' ~ h[16:20] ~ '-' ~ h[20:32]) if (h | length == 32) else 'n/d' }}
 
 - name: Consultar estado en línea del sensor (con reintentos)
   ansible.builtin.uri:
