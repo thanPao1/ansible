@@ -1,20 +1,45 @@
+- name: Registrar resultado - sensor fuera de línea
+  ansible.builtin.set_stats:
+    data:
+      crowdstrike_gate_result: sensor_fuera_de_linea
+      crowdstrike_gate_host: "{{ target_hostname }}"
+      crowdstrike_gate_aid: "{{ cs_aid }}"
+  when: cs_online_state != crowdstrike_required_online_state
+
 - name: Fallar el gate si el sensor no está en línea
   ansible.builtin.fail:
     msg: >
-      Gate de seguridad FALLIDO: AID '{{ cs_aid }}' encontrado, pero el sensor
+      Gate de seguridad FALLIDO [SENSOR FUERA DE LÍNEA]: AID '{{ cs_aid }}' encontrado, pero el sensor
       no está en línea (estado: '{{ cs_online_state }}',
       last_seen: '{{ cs_last_seen | default('desconocido') }}',
       HTTP online-state: '{{ cs_online.status | default('sin respuesta') }}').
   when: cs_online_state != crowdstrike_required_online_state
 
+- name: Registrar resultado - sensor en RFM
+  ansible.builtin.set_stats:
+    data:
+      crowdstrike_gate_result: sensor_rfm
+      crowdstrike_gate_host: "{{ target_hostname }}"
+      crowdstrike_gate_aid: "{{ cs_aid }}"
+  when:
+    - crowdstrike_fail_on_rfm | bool
+    - cs_rfm == 'yes'
+
 - name: Fallar el gate si el sensor está en modo de funcionalidad reducida
   ansible.builtin.fail:
     msg: >
-      Gate de seguridad FALLIDO: AID '{{ cs_aid }}' está en modo de
+      Gate de seguridad FALLIDO [SENSOR EN RFM]: AID '{{ cs_aid }}' está en modo de
       funcionalidad reducida (RFM = '{{ cs_rfm }}').
   when:
     - crowdstrike_fail_on_rfm | bool
     - cs_rfm == 'yes'
+
+- name: Registrar resultado - gate exitoso
+  ansible.builtin.set_stats:
+    data:
+      crowdstrike_gate_result: ok
+      crowdstrike_gate_host: "{{ target_hostname }}"
+      crowdstrike_gate_aid: "{{ cs_aid }}"
 
 - name: Gate de seguridad exitoso
   ansible.builtin.debug:
